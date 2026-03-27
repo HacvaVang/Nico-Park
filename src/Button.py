@@ -1,39 +1,53 @@
 from enum import Enum
 import cocos
 from cocos.sprite import Sprite
+import pyglet.image
 
 class TypeButton(Enum):
     ActivateObj = 0
     StretchVertical = 1
     StretchHorizontal = 2
     Prohibited = 3
-    
+    IncreaseSize = 4
+    DecreaseSize = 5
+    Neutral = 6
+
 class Button(Sprite):
-    def __init__(self, image, position, button_type: TypeButton = TypeButton.ActivateObj):
-        super(Button, self).__init__(image)
+    def __init__(self, position, button_type: TypeButton = TypeButton.ActivateObj,
+                 image_off: str = "assets/interactions/Button0.png",
+                 image_on:  str = "assets/interactions/Button1.png"):
+        # Pre-load both textures once — avoids re-reading from disk every frame
+        self._img_off = pyglet.image.load(image_off)
+        self._img_on  = pyglet.image.load(image_on)
+
+        super(Button, self).__init__(self._img_off)
         self.type = button_type
         self.position = position
-        self.onStatus = True
+        self.onStatus = False
         self.scale = 1.0
-        
-    def activate(self):
-        """Called when the button is activated/pressed."""
-        self.onStatus = not self.onStatus
-        # Toggle visual state if needed
-        if self.onStatus:
-            self.color = (255, 255, 255) # Default
-        else:
-            self.color = (150, 150, 150) # Pressed/Deactivated
-            
+        self.was_colliding = False
+
+    def set_status(self, is_on):
+        """Switch button state and update texture (only when state actually changed)."""
+        if self.onStatus != is_on:
+            self.onStatus = is_on
+            # Swap to pre-loaded texture — no disk I/O, no flicker
+            self.image = self._img_on if is_on else self._img_off
+
     def check_interaction(self, character):
-        """Check if character is interacting with this button"""
-        # Simple distance-based interaction check
-        cx, cy = character.position
+        """AABB overlap test using the character's actual scaled, bottom-anchored hitbox."""
+        bw, bh = self.width, self.height
         bx, by = self.position
-        dist_sq = (cx - bx)**2 + (cy - by)**2
-        
-        # If character is within 50 pixels
-        if dist_sq < 2500:
-            self.activate()
-            return True
-        return False
+        button_rect = cocos.rect.Rect(bx - bw/2, by - bh/2, bw, bh)
+
+        # Use base dims × scale (same formula as Character.update physics)
+
+        char_rect = character.get_leg_collision_rect()
+
+        is_colliding = button_rect.intersects(char_rect)
+
+        # Stay ON as long as character is inside; turn OFF when they leave
+        self.set_status(is_colliding)
+
+        self.was_colliding = is_colliding
+        return is_colliding
