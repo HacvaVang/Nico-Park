@@ -60,7 +60,7 @@ class Character(Sprite):
         if self.collision_boxes:
             
             leg_h  = h * (1 - 64 / 96)   # lower half
-            leg_w  = w * (1 - 32 / 80)
+            leg_w  = w * 32 / 80
             head_h = h * (64 / 96)   # upper half
 
             # --- X-axis collision (full body width, full height) ---
@@ -97,6 +97,13 @@ class Character(Sprite):
                         new_y = solid.y - h
                         self.velocity[1] = 0
                         self.head_rect.y = new_y + leg_h
+                    if self.is_on_ground:
+                        if self.velocity[0] > 0:
+                            new_x = solid.x - w/2
+                            self.head_rect.x = new_x - w/2
+                        elif self.velocity[0] < 0:
+                            new_x = solid.x + solid.width + w/2
+                        self.head_rect.x = new_x - w/2
         else:
             if self.velocity[1] != 0:
                 self.is_on_ground = False

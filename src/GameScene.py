@@ -10,8 +10,8 @@ from .Button import TypeButton, Button
 from .MapManager import MapManager
 from .Obstacle import Obstacle
 from .DebugLayer import DebugLayer
-
-
+import pyglet
+pyglet.options['audio'] = ('ffmpeg', 'openal', 'pulse', 'directsound', 'silent')
 
 class GameScene(ScrollableLayer):
     is_event_handler = True
@@ -54,6 +54,16 @@ class GameScene(ScrollableLayer):
         # Debug overlay (child of this layer — shares our coordinate space exactly)
         self.debug_layer = DebugLayer(map_manager, self)
         self.add(self.debug_layer, z=100)
+
+        # Background music
+        try:
+            bg_music = pyglet.media.load('assets/sound/Hands.wav')
+            self.bg_player = pyglet.media.Player()
+            self.bg_player.queue(bg_music)
+            self.bg_player.loop = True
+            self.bg_player.play()
+        except Exception as e:
+            print(f"Could not load background music: {e}")
 
         self.schedule(self.update)
 

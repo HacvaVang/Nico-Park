@@ -60,24 +60,20 @@ class DebugLayer(Layer):
         for rect in self.map_manager.get_land_collisions():
             _rect(rect.x, rect.y, rect.width, rect.height, COL_LAND)
 
-        # ── 2. Player boxes — use same scaled dims as Character.update() ─────
+        # ── 2. Player boxes \u2014 use the actual collision rects from Character ──
         player = self.game_layer.player
-        s  = player.scale
-        w  = player.base_w * s
-        h  = player.base_h * s
-        leg_h  = h * (1 - 64 / 96)
-        leg_w  = w * (1 - 32 / 80)
-        head_h = h * (64 / 96)
-        px, py = player.position   # py = bottom of sprite (bottom-anchor)
 
         # Full body / wall rect
-        _rect(px - w/2, py, w, h, COL_PLAYER)
+        r_full = player.get_full_collision_rect()
+        _rect(r_full.x, r_full.y, r_full.width, r_full.height, COL_PLAYER)
 
-        # Leg rect (floor detection \u2014 narrow + short)
-        _rect(px - leg_w/2, py, leg_w, leg_h, COL_LEG)
+        # Leg rect (floor detection)
+        r_leg = player.get_leg_collision_rect()
+        _rect(r_leg.x, r_leg.y, r_leg.width, r_leg.height, COL_LEG)
 
-        # Head rect (ceiling detection \u2014 full width, upper portion)
-        _rect(px - w/2, py + leg_h, w, head_h, COL_HEAD)
+        # Head rect (ceiling detection)
+        r_head = player.get_head_collision_rect()
+        _rect(r_head.x, r_head.y, r_head.width, r_head.height, COL_HEAD)
 
         # ── 3. Buttons ───────────────────────────────────────────────────────
         for btn in self.game_layer.buttons:
