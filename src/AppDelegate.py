@@ -1,6 +1,7 @@
 # AppDelegate.py
 import cocos
 from cocos.director import director
+from .MainMenu import create_main_menu
 from .GameScene import create_game_scene
 
 
@@ -15,7 +16,7 @@ class AppDelegate:
             caption="Nico Park",
             resizable=False
         )
-        director.show_FPS = True
+        menu = False
 
-        scene = create_game_scene()
+        scene = create_main_menu() if menu else create_game_scene()
         director.run(scene)

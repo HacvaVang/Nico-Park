@@ -35,6 +35,7 @@ class Character(Sprite):
         self.scale_speed = 0.05
 
         self.anchor = (self.base_w / 2, 0)
+        self.image_anchor = (self.base_w / 2, 0)
 
         # Current collision rects (updated every frame in update())
         self.rect_x   = cocos.rect.Rect(0, 0, self.base_w, self.base_h)
@@ -64,14 +65,14 @@ class Character(Sprite):
 
             # --- X-axis collision (full body width, full height) ---
             self.rect_x = cocos.rect.Rect(new_x - w/2, y, w, h)
-            for solid in self.collision_boxes:
-                if self.rect_x.intersects(solid):
-                    if self.velocity[0] > 0:
-                        new_x = solid.x - w/2
-                        self.rect_x.x = new_x - w/2
-                    elif self.velocity[0] < 0:
-                        new_x = solid.x + solid.width + w/2
-                        self.rect_x.x = new_x - w/2
+            # for solid in self.collision_boxes:
+            #     if self.rect_x.intersects(solid):
+            #         if self.velocity[0] > 0:
+            #             new_x = solid.x - w/2
+            #             self.rect_x.x = new_x - w/2
+            #         elif self.velocity[0] < 0:
+            #             new_x = solid.x + solid.width + w/2
+            #             self.rect_x.x = new_x - w/2
 
             # --- Y-axis: Leg box (lower portion) — floor detection ---
             # Anchor is BOTTOM: sprite goes from new_y (bottom) to new_y+h (top)
