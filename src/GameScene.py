@@ -114,6 +114,8 @@ class GameScene(ScrollableLayer):
             if button.check_interaction(self.player):
                 self.player.apply_button_effect(button)
 
+        self.check_bullet_mob_collision(self.mobs)
+
         # Đẩy character ra khỏi obstacle nếu đang va chạm
         for obs in self.obstacles:
             obs.push_character_out(self.player)
@@ -125,6 +127,14 @@ class GameScene(ScrollableLayer):
         self.coins = [c for c in self.coins if c.parent is not None]
         self.check_gun_collect()
         self.guns = [c for c in self.guns if c.parent is not None]
+
+    def check_bullet_mob_collision(self, mobs):
+        for mob in mobs[:]:
+            for bullet in self.bullets[:]:
+                if bullet.get_hitbox().intersects(mob.get_hitbox()):
+                    bullet.dead = True
+                    mob.take_damage(bullet.damage)
+
 
     def check_gun_collect(self):
         player_rect = self.player.get_leg_collision_rect()

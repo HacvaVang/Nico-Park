@@ -20,8 +20,8 @@ class Character(Sprite):
     def __init__(self, collision_boxes = None, start_pos = None):
         self.animation = self.load_animation()
         super(Character, self).__init__(image = self.animation["idle"],position=start_pos)
+        self.checkpoint = start_pos or (0, 0)
         self.collision_boxes = collision_boxes
-        self.status = CharacterState.IDLE
         self.velocity = [0, 0]
         self.speed = 250
         self.gravity = -600
@@ -32,7 +32,6 @@ class Character(Sprite):
         self.state = "idle"
         self.is_die = False
         self.is_piloting = False   # True while riding the Ship
-        self.has_gun = False
         self.has_gun = False
         self.gun_sprite = None
         self.shoot_cooldown = 0.3
@@ -106,10 +105,11 @@ class Character(Sprite):
         w = self.base_w * self.scale
         h = self.base_h * self.scale
 
-        if self.collision_boxes:
+        if self.collision_boxes and not self.is_die:
 
             leg_h = h * (1 - 64 / 96)  # lower half
             leg_w = w * 32 / 80
+            
             head_h = h * (64 / 96)  # upper half
 
             # --- X-axis collision (full body width, full height) ---
@@ -244,8 +244,9 @@ class Character(Sprite):
             pass
         elif button_type == TypeButton.StretchHorizontal:
             pass
-        elif button_type == TypeButton.Prohibited:
-            pass
+        elif button_type == TypeButton.Prohibited:  
+            print("Prohibited")
+            self.die()
         elif button_type == TypeButton.IncreaseSize:
             self.target_scale += 0.005   # set target, not scale directly
         elif button_type == TypeButton.DecreaseSize:
@@ -256,6 +257,8 @@ class Character(Sprite):
 
 
     def handle_key_press(self, k, modifiers):
+        if self.is_die:
+            return
         if k == key.A:
             self.velocity[0] = -self.speed
             self.scale_x = -abs(self.scale_x)
@@ -269,6 +272,8 @@ class Character(Sprite):
 
 
     def handle_key_release(self, k, modifiers):
+        if self.is_die:
+            return
         if k in (key.A, key.D):
             self.velocity[0] = 0
 
@@ -280,32 +285,75 @@ class Character(Sprite):
     
     def get_full_collision_rect(self):
         return self.rect_x
+
     def die(self):
+        if self.is_die:
+            return
         self.is_die = True
         self.state = "die"
         self.image = self.animation[self.state]
-        self.velocity[1] += 40
-        self.sound["die"].play()
+        # self.sound["die"].play()
+        
+        # Stop horizontal movement, jump up and fall through floor
+        self.velocity[0] = 0
+        self.velocity[1] = 400
+        
+        # Schedule respawn after 1.5 seconds
+        pyglet.clock.schedule_once(self.respawn, 2)
+
+    def respawn(self, dt=0):
+        self.is_die = False
+        self.velocity = [0, 0]
+        if hasattr(self, 'checkpoint'):
+            self.position = self.checkpoint
+        self.state = "idle"
+        self.update_animation()
+        self.update_collision_box()
+
+    def update_collision_box(self):
+        w = self.base_w * self.scale
+        h = self.base_h * self.scale
+
+        leg_h = h * (1 - 64 / 96)
+        leg_w = w * 32 / 80
+        head_h = h * (64 / 96)
+
+        new_x, new_y = self.position
+
+        self.leg_rect = cocos.rect.Rect(new_x - leg_w / 2, new_y, leg_w, leg_h)
+        self.head_rect = cocos.rect.Rect(new_x - w / 2, new_y + leg_h, w, head_h)
+        self.rect_x = cocos.rect.Rect(new_x - w / 2, new_y, w, h)
+
     def check_stomp(self, mobs):
-        if self.velocity[1] >= 0:  # Đang đi lên hoặc đứng yên thì không stomp
+        if self.is_die:
             return
 
         px, py = self.position
-        for mob in mobs[:]:  # copy list để xóa an toàn
+        for mob in mobs[:]:
+            if getattr(mob, 'is_die', False):
+                continue
+
             mx, my = mob.position
             mw = mob.base_w * mob.scale
             mh = mob.base_h * mob.scale
 
-            # Chân player phải ở trên đầu mob
-            player_bottom = py
-            mob_top = my + mh
+            # Construct mob hitbox (centered at X, growing upwards from Y)
+            mob_rect = cocos.rect.Rect(mx - mw / 2, my, mw, mh)
 
-            in_x = abs(px - mx) < (mw / 2 + self.base_w * self.scale / 2) * 0.8
-            stomping = player_bottom <= mob_top and player_bottom >= mob_top - 20
+            # Check if player intersects with mob
+            if self.leg_rect.intersects(mob_rect) or self.head_rect.intersects(mob_rect):
+                player_bottom = py
+                mob_top = my + mh
+                
+                # Check if it is a stomp: falling down and hitting the top section of the mob
+                is_stomp = self.velocity[1] < 0 and player_bottom >= mob_top - min(30, mh * 0.4)
 
-            if in_x and stomping:
-                mob.die()
-                self.velocity[1] = 300  # Nảy lên sau khi giẫm
+                if is_stomp:
+                    mob.die()
+                    self.velocity[1] = 300  # Bounce up after stomp
+                else:
+                    self.die()  # Player dies otherwise
+                    return
 
     def pick_up_gun(self, gun):
         self.has_gun = True
@@ -314,7 +362,7 @@ class Character(Sprite):
         self.add(self.gun_sprite, z=2)
 
     def shoot(self):
-        if not self.has_gun:
+        if not self.has_gun or self.is_die:
             return None
         direction = 1 if self.scale_x > 0 else -1
         from .Bullet import Bullet

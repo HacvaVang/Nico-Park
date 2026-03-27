@@ -75,7 +75,8 @@ class MainMenu(Menu):
         clock.schedule_once(lambda dt: director.push(Scene(AboutMenu())), 0.01)
 
     def on_exit(self):
-        app.exit()
+        print("exit")
+        director.terminate_app = True
 
 
 
