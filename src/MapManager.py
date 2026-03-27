@@ -38,3 +38,5 @@ class MapManager:
 
     def get_object_position_list(self, name: str):
         return self.object_spawn_position.get(name, [])
+
+    

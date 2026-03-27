@@ -8,6 +8,8 @@ class BossState(Enum):
     ATTACK = 2
     DEATH = 3
 
+
+
 class Boss(Sprite):
     """
     Template for a Boss enemy.

@@ -10,6 +10,8 @@ from .Button import TypeButton, Button
 from .MapManager import MapManager
 from .Obstacle import Obstacle
 from .DebugLayer import DebugLayer
+from .Minion import Mob
+
 import pyglet
 pyglet.options['audio'] = ('ffmpeg', 'openal', 'pulse', 'directsound', 'silent')
 
@@ -43,6 +45,11 @@ class GameScene(ScrollableLayer):
         self.add(self.buttons[1], z=1)
         self.add(self.buttons[2], z=1)
         self.add(self.buttons[3], z=1)
+
+        # Tạo Mob
+        for pos in map_manager.get_object_position_list("Mob"):
+            mob = Mob(pos)
+            self.add(mob, z=1)
 
         # Tạo Obstacle (Door) — linked to buttons[2], reacts to its state each frame
         obstacle_positions = map_manager.get_object_position_list("Obstacle")
