@@ -89,6 +89,15 @@ class GameScene(ScrollableLayer):
 
 
 def create_game_scene(findpath : str = "assets/map.tmx"):
+
+
+    # Create Color layer for background
+    main_scene = cocos.scene.Scene()
+    bg_color = (255, 255, 255, 255)
+    static_bg = cocos.layer.ColorLayer(*bg_color)
+    main_scene.add(static_bg, z=-1)
+
+
     scroller = ScrollingManager()
 
     tile_map = load(findpath)
@@ -96,9 +105,13 @@ def create_game_scene(findpath : str = "assets/map.tmx"):
         print(f"Rendering layer: {name}")
         scroller.add(layer, z=0)
 
+
+
     # Single MapManager shared between GameScene and DebugLayer
     map_manager = MapManager(findpath)
     game_layer  = GameScene(scroller, map_manager)
+
     scroller.add(game_layer, z=1)
 
-    return Scene(scroller)
+    main_scene.add(scroller, z=0)
+    return main_scene

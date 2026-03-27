@@ -34,7 +34,6 @@ class Character(Sprite):
         self.target_scale = 1.0
         self.scale_speed = 0.05
 
-        self.anchor = (self.base_w / 2, 0)
         self.image_anchor = (self.base_w / 2, 0)
 
         # Current collision rects (updated every frame in update())
