@@ -25,6 +25,8 @@ COL_LEG       = (1.0, 1.0, 0.0, 1.0)   # yellow – leg rect
 COL_HEAD      = (1.0, 0.4, 0.0, 1.0)   # orange – head rect
 COL_BUTTON    = (1.0, 0.2, 1.0, 0.9)   # purple – button hitbox
 COL_OBSTACLE  = (1.0, 0.2, 0.2, 0.9)   # red    – obstacle hitbox
+COL_SHIP      = (0.0, 1.0, 1.0, 0.9)   # cyan   – ship hitbox
+
 
 
 def _rect(x, y, w, h, color):
@@ -85,6 +87,13 @@ class DebugLayer(Layer):
         for obs in self.game_layer.obstacles:
             r = obs.get_hitbox()
             _rect(r.x, r.y, r.width, r.height, COL_OBSTACLE)
+
+        # ── 5. Ships ─────────────────────────────────────────────────────────
+        for ship in getattr(self.game_layer, 'ships', []):
+            if ship.visible:
+                r = ship.get_hitbox()
+                _rect(r.x, r.y, r.width, r.height, COL_SHIP)
+
 
         glLineWidth(1.0)
         glDisable(GL_BLEND)

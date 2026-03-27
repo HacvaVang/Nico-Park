@@ -11,6 +11,7 @@ from .MapManager import MapManager
 from .Obstacle import Obstacle
 from .DebugLayer import DebugLayer
 from .Minion import Mob
+from .Ship import Ship
 
 import pyglet
 pyglet.options['audio'] = ('ffmpeg', 'openal', 'pulse', 'directsound', 'silent')
@@ -36,20 +37,24 @@ class GameScene(ScrollableLayer):
         
         # Tạo Button
         self.buttons = list()
-        self.buttons.append(Button(map_manager.get_object_position_list("Button")[0], TypeButton.IncreaseSize))
-        self.buttons.append(Button(map_manager.get_object_position_list("Button")[1], TypeButton.DecreaseSize))
-        self.buttons.append(Button(map_manager.get_object_position_list("Button")[2], TypeButton.Neutral))
-        self.buttons.append(Button(map_manager.get_object_position_list("Button")[3], TypeButton.Neutral))
+        status_list = [TypeButton.IncreaseSize, TypeButton.DecreaseSize, TypeButton.Neutral, TypeButton.Neutral, TypeButton.Prohibited, TypeButton.Prohibited]
+        for i in range(len(status_list)):
+            button = Button(map_manager.get_object_position_list("Button")[i], status_list[i])
+            self.buttons.append(button)
+            self.add(button, z=1)
 
-        self.add(self.buttons[0], z=1)
-        self.add(self.buttons[1], z=1)
-        self.add(self.buttons[2], z=1)
-        self.add(self.buttons[3], z=1)
 
         # Tạo Mob
         for pos in map_manager.get_object_position_list("Mob"):
             mob = Mob(pos)
             self.add(mob, z=1)
+
+        # Spawn Ships from map
+        self.ships = []
+        for pos in map_manager.get_object_position_list("Ship"):
+            ship = Ship(pos)
+            self.ships.append(ship)
+            self.add(ship, z=1)
 
         # Tạo Obstacle (Door) — linked to buttons[2], reacts to its state each frame
         obstacle_positions = map_manager.get_object_position_list("Obstacle")
@@ -74,29 +79,53 @@ class GameScene(ScrollableLayer):
         except Exception as e:
             print(f"Could not load background music: {e}")
 
+        # Currently piloted ship (None when on foot)
+        self.active_ship: Ship = None
+
         self.schedule(self.update)
 
     def update(self, dt):
-        # Camera follow
-        self.scroller.set_focus(self.player.position[0], self.player.position[1])
-        
-        # Kiểm tra va chạm với button
-        for button in self.buttons:
-            if button.check_interaction(self.player):
-                self.player.apply_button_effect(button)
+        # Camera follows the player (or the plane when piloting)
+        focus = self.active_ship.position if self.active_ship else self.player.position
+        self.scroller.set_focus(focus[0], focus[1])
 
-        # Đẩy character ra khỏi obstacle nếu đang va chạm
-        for obs in self.obstacles:
-            obs.push_character_out(self.player)
-        if self.y >= DIE_DISTANCE and not self.player.is_die:
-            self.player.die()
+        if self.active_ship is None:
+            # On-foot logic only
+            for button in self.buttons:
+                if button.check_interaction(self.player):
+                    self.player.apply_button_effect(button)
+
+            for obs in self.obstacles:
+                obs.push_character_out(self.player)
+
+            # Death check
+            if self.player.position[1] <= DIE_DISTANCE and not self.player.is_die:
+                self.player.die()
+
 
 
     def on_key_press(self, k, modifiers):
-        self.player.handle_key_press(k, modifiers)
+        if self.active_ship is not None:
+            # In-plane: all keys go to the ship; SPACE dismounts inside Ship
+            self.active_ship.handle_key_press(k, modifiers)
+            # SPACE clears pilot; sync active_ship here
+            if self.active_ship.pilot is None:
+                self.active_ship = None
+        else:
+            # On foot: W while overlapping a ship → board it
+            if k == key.W:
+                for ship in self.ships:
+                    if ship.check_interaction(self.player):
+                        ship.mount(self.player)
+                        self.active_ship = ship
+                        return   # swallow the W key
+            self.player.handle_key_press(k, modifiers)
 
     def on_key_release(self, k, modifiers):
-        self.player.handle_key_release(k, modifiers)
+        if self.active_ship is not None:
+            self.active_ship.handle_key_release(k, modifiers)
+        else:
+            self.player.handle_key_release(k, modifiers)
 
 
 

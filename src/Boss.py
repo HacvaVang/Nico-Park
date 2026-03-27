@@ -15,7 +15,7 @@ class Boss(Sprite):
     Template for a Boss enemy.
     Handles complex patterns, higher health, and distinct phases.
     """
-    def __init__(self, position, image="assets/sprite/Blue1.png"): # Placeholder image
+    def __init__(self, position, image="assets/AngryNeko.png"): # Placeholder image
         super(Boss, self).__init__(image)
         self.position = position
         self.status = BossState.IDLE

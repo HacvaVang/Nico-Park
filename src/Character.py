@@ -31,6 +31,7 @@ class Character(Sprite):
         self.maximum_scale = 2.5
         self.state = "idle"
         self.is_die = False
+        self.is_piloting = False   # True while riding the Ship
 
         # Store unscaled base dimensions — used for all physics/collision math
         # self.width/height return SCALED values so we must cache the originals
@@ -75,6 +76,10 @@ class Character(Sprite):
         return dict_animation
 
     def update(self, dt):
+        # While piloting a Ship, physics and animation are handled by the Ship
+        if self.is_piloting:
+            return
+
         self.velocity[1] += self.gravity * dt
 
         x, y = self.position
