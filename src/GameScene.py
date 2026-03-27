@@ -11,6 +11,7 @@ from .MapManager import MapManager
 from .Obstacle import Obstacle
 from .DebugLayer import DebugLayer
 from .Minion import Mob
+from .Coin import Coin
 
 import pyglet
 pyglet.options['audio'] = ('ffmpeg', 'openal', 'pulse', 'directsound', 'silent')
@@ -47,9 +48,15 @@ class GameScene(ScrollableLayer):
         self.add(self.buttons[3], z=1)
 
         # Tạo Mob
+        self.mobs = []
         for pos in map_manager.get_object_position_list("Mob"):
             mob = Mob(pos)
+            mob.on_die = self.on_mob_die  # Gắn callback
             self.add(mob, z=1)
+            self.mobs.append(mob)
+        for pos in map_manager.get_object_position_list("Coin"):
+            coin = Coin(pos)
+            self.add(coin, z=1)
 
         # Tạo Obstacle (Door) — linked to buttons[2], reacts to its state each frame
         obstacle_positions = map_manager.get_object_position_list("Obstacle")
@@ -90,6 +97,8 @@ class GameScene(ScrollableLayer):
             obs.push_character_out(self.player)
         if self.y >= DIE_DISTANCE and not self.player.is_die:
             self.player.die()
+        self.player.check_stomp(self.mobs)
+        self.mobs = [m for m in self.mobs if not m.is_die]
 
 
     def on_key_press(self, k, modifiers):
@@ -98,7 +107,9 @@ class GameScene(ScrollableLayer):
     def on_key_release(self, k, modifiers):
         self.player.handle_key_release(k, modifiers)
 
-
+    def on_mob_die(self, position):
+        coin = Coin(position)
+        self.add(coin, z=1)
 
 def create_game_scene(findpath : str = "assets/map.tmx"):
 

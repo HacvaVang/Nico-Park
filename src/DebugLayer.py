@@ -85,6 +85,9 @@ class DebugLayer(Layer):
         for obs in self.game_layer.obstacles:
             r = obs.get_hitbox()
             _rect(r.x, r.y, r.width, r.height, COL_OBSTACLE)
+        for mob in self.game_layer.mobs:
+            r = mob.get_hitbox()
+            _rect(r.x, r.y, r.width, r.height, COL_OBSTACLE)
 
         glLineWidth(1.0)
         glDisable(GL_BLEND)
