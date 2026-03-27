@@ -25,7 +25,7 @@ class Character(Sprite):
         self.velocity = [0, 0]
         self.speed = 250
         self.gravity = -600
-        self.jump_speed = 300
+        self.jump_speed = 500
         self.is_on_ground = False
         self.minimum_scale = 0.5
         self.maximum_scale = 2.5
@@ -76,11 +76,11 @@ class Character(Sprite):
 
     def update(self, dt):
         self.velocity[1] += self.gravity * dt
-        
+
         x, y = self.position
         new_x = x + self.velocity[0] * dt
         new_y = y + self.velocity[1] * dt
-         
+
         # Hitbox dimensions scale with the character visual size.
         # We multiply base dims by self.scale so the hitbox grows/shrinks together with
         # the sprite while the base dims remain constant for stable ratio calculations.
@@ -88,13 +88,13 @@ class Character(Sprite):
         h = self.base_h * self.scale
 
         if self.collision_boxes:
-            
-            leg_h  = h * (1 - 64 / 96)   # lower half
-            leg_w  = w * 32 / 80
-            head_h = h * (64 / 96)   # upper half
+
+            leg_h = h * (1 - 64 / 96)  # lower half
+            leg_w = w * 32 / 80
+            head_h = h * (64 / 96)  # upper half
 
             # --- X-axis collision (full body width, full height) ---
-            self.rect_x = cocos.rect.Rect(new_x - w/2, y, w, h)
+            #self.rect_x = cocos.rect.Rect(new_x - w / 2, y, w, h)
             # for solid in self.collision_boxes:
             #     if self.rect_x.intersects(solid):
             #         if self.velocity[0] > 0:
@@ -105,38 +105,73 @@ class Character(Sprite):
             #             self.rect_x.x = new_x - w/2
 
             # --- Y-axis: Leg box (lower portion) — floor detection ---
-            # Anchor is BOTTOM: sprite goes from new_y (bottom) to new_y+h (top)
-            self.leg_rect = cocos.rect.Rect(new_x - leg_w/2, new_y, leg_w, leg_h)
+            self.leg_rect = cocos.rect.Rect(new_x - leg_w / 2, new_y, leg_w, leg_h)
             self.is_on_ground = False
             for solid in self.collision_boxes:
                 if self.leg_rect.intersects(solid):
-                    if self.velocity[1] <= 0:
-                        # Place character bottom exactly on top of the solid
-                        new_y = solid.y + solid.height
-                        self.velocity[1] = 0
-                        self.is_on_ground = True
-                        self.leg_rect.y = new_y
+                    # Tính penetration depth theo từng trục
+                    leg_top = new_y + leg_h
+                    leg_bottom = new_y
+                    solid_top = solid.y + solid.height
+                    solid_bottom = solid.y
+
+                    overlap_y = min(leg_top, solid_top) - max(leg_bottom, solid_bottom)
+
+                    leg_left = new_x - leg_w / 2
+                    leg_right = new_x + leg_w / 2
+                    overlap_x = min(leg_right, solid.x + solid.width) - max(leg_left, solid.x)
+
+                    if overlap_y <= overlap_x:
+                        # Va chạm dọc (mặt trên) → snap floor
+                        if self.velocity[1] <= 0:
+                            new_y = solid_top
+                            self.velocity[1] = 0
+                            self.is_on_ground = True
+                            self.leg_rect.y = new_y
+                    else:
+                        # Va chạm ngang → block X
+                        if self.velocity[0] > 0:
+                            new_x = solid.x - leg_w / 2
+                        elif self.velocity[0] < 0:
+                            new_x = solid.x + solid.width + leg_w / 2
+                        self.velocity[0] = 0
+                        self.leg_rect.x = new_x - leg_w / 2
 
             # --- Y-axis: Head box (upper portion) — ceiling detection ---
-            # Head starts at leg_h above the bottom, extends to the top
-            self.head_rect = cocos.rect.Rect(new_x - w/2, new_y + leg_h, w, head_h)
+            self.head_rect = cocos.rect.Rect(new_x - w / 2, new_y + leg_h, w, head_h)
             for solid in self.collision_boxes:
                 if self.head_rect.intersects(solid):
-                    if self.velocity[1] > 0:
-                        # Place character so its top is at the solid's bottom
-                        new_y = solid.y - h
-                        self.velocity[1] = 0
-                        self.head_rect.y = new_y + leg_h
-                    if self.is_on_ground:
+                    head_top = new_y + h
+                    head_bottom = new_y + leg_h
+                    solid_top = solid.y + solid.height
+                    solid_bottom = solid.y
+
+                    # Tính penetration depth theo từng trục
+                    overlap_y = min(head_top, solid_top) - max(head_bottom, solid_bottom)
+
+                    head_left = new_x - w / 2
+                    head_right = new_x + w / 2
+                    overlap_x = min(head_right, solid.x + solid.width) - max(head_left, solid.x)
+
+                    if overlap_y < overlap_x:
+                        # Va chạm dọc (penetration Y nhỏ hơn → mặt trên/dưới)
+                        if self.velocity[1] > 0:  # Cộc đầu
+                            new_y = solid_bottom - h
+                            self.velocity[1] = 0
+                        elif self.velocity[1] < 0:  # Chạm sàn bằng head_rect
+                            new_y = solid_top - leg_h
+                            self.velocity[1] = 0
+                            self.is_on_ground = True
+                    else:
+                        # Va chạm ngang (penetration X nhỏ hơn → mặt bên)
                         if self.velocity[0] > 0:
-                            new_x = solid.x - w/2
-                            self.head_rect.x = new_x - w/2
+                            new_x = solid.x - w / 2
                         elif self.velocity[0] < 0:
-                            new_x = solid.x + solid.width + w/2
-                        self.head_rect.x = new_x - w/2
-        else:
-            if self.velocity[1] != 0:
-                self.is_on_ground = False
+                            new_x = solid.x + solid.width + w / 2
+                        self.velocity[0] = 0
+
+                    self.head_rect.x = new_x - w / 2
+                    self.head_rect.y = new_y + leg_h
 
         self.position = (new_x, new_y)
 
