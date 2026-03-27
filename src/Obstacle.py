@@ -8,23 +8,16 @@ class ObstacleState(Enum):
     ACTIVE   = 0   # solid, visible, blocking
     INACTIVE = 1   # transparent, no collision
 
-
-class Obstacle(Sprite):
-    """A game obstacle that has a hitbox and reacts to a linked Button's state."""
-
-    def __init__(self, image, position, linked_button: Button = None):
-        super(Obstacle, self).__init__(image)
-        self.position = position
+class Obstacle(cocos.layer.ColorLayer):
+    def __init__(self, position, linked_button: Button = None, width=32, height=96):
+        super(Obstacle, self).__init__(255, 100, 50, 255, width=width, height=height)
+        self.position = position[:2]
         self.linked_button = linked_button
-
-        # Cache base (unscaled) dimensions for stable hitbox math
-        self.base_w = self.width
-        self.base_h = self.height
-
-        # Start active by default; the button toggles this
+        self.base_w = width
+        self.base_h = height
         self.state = ObstacleState.ACTIVE
+        self.image_anchor = (self.base_w / 2, 0)
         self._apply_state()
-
         self.schedule(self.update)
 
     # ------------------------------------------------------------------
@@ -39,7 +32,7 @@ class Obstacle(Sprite):
         """Return the current AABB hitbox (bottom-left origin, unscaled dims)."""
         w, h = self.base_w, self.base_h
         x, y = self.position
-        return cocos.rect.Rect(x - w / 2, y - h / 2, w, h)
+        return cocos.rect.Rect(x , y, w, h)
 
     # ------------------------------------------------------------------
     # Update
@@ -141,6 +134,22 @@ class Obstacle(Sprite):
         else:
             self.opacity = 80   # semi-transparent when inactive/passthrough
 
+    def open(self):
+        if self.state == ObstacleState.INACTIVE:
+            return
+        self.state = ObstacleState.INACTIVE
+        self.open_speed = 150  # pixel/giây
+        self.schedule(self.animate_open)
+
+    def animate_open(self, dt):
+        x, y = self.position
+        target_y = y - self.base_h  # hạ xuống đúng 1 chiều cao
+        new_y = y - self.open_speed * dt
+        if new_y <= target_y:
+            self.position = (x, target_y)
+            self.unschedule(self.animate_open)
+        else:
+            self.position = (x, new_y)
 
 def _char_rect(character) -> cocos.rect.Rect:
     """Build the character's AABB using its base (unscaled) dimensions."""

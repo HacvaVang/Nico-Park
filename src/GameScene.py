@@ -25,8 +25,10 @@ class GameScene(ScrollableLayer):
 
     def __init__(self, scroller, map_manager: MapManager = None):
         super(GameScene, self).__init__()
-
         self.scroller = scroller
+        self.coins_collected = 0
+        self.coins_required = 3
+        self.door_opened = False
 
         # Allow map_manager to be injected (avoids double-loading in create_game_scene)
         if map_manager is None:
@@ -77,7 +79,7 @@ class GameScene(ScrollableLayer):
         self.obstacles = []
         if obstacle_positions:
             for pos in obstacle_positions:
-                obs = Obstacle("assets/map_object/Door0.png", pos, self.buttons[2])
+                obs = Obstacle(pos, self.buttons[2])
                 self.obstacles.append(obs)
                 self.add(obs, z=1)
 
@@ -149,14 +151,26 @@ class GameScene(ScrollableLayer):
                 self.player.pick_up_gun(gun)
 
     def check_coin_collect(self):
-        player_rect = self.player.get_leg_collision_rect()  # Cần có method này trong Character
+        player_rect = self.player.get_leg_collision_rect()
         for coin in self.coins[:]:
-            if player_rect.intersects(coin.get_hitbox()):
+            if not coin.collected and player_rect.intersects(coin.get_hitbox()):
                 coin.collect()
-        player_rect = self.player.get_head_collision_rect()  # Cần có method này trong Character
+                self.coins_collected += 1
+
+        player_rect = self.player.get_head_collision_rect()
         for coin in self.coins[:]:
-            if player_rect.intersects(coin.get_hitbox()):
+            if not coin.collected and player_rect.intersects(coin.get_hitbox()):
                 coin.collect()
+                self.coins_collected += 1
+
+        if not self.door_opened and self.coins_collected >= self.coins_required:
+            self.open_door()
+
+    def open_door(self):
+        self.door_opened = True
+        if self.obstacles:
+            self.obstacles[0].open()  # Chỉ mở obstacle đầu tiên
+        print(f"Door opened! {self.coins_collected}/{self.coins_required}")
 
 
     def on_key_press(self, k, modifiers):
