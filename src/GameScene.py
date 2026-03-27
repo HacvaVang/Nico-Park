@@ -54,8 +54,10 @@ class GameScene(ScrollableLayer):
             mob.on_die = self.on_mob_die  # Gắn callback
             self.add(mob, z=1)
             self.mobs.append(mob)
+        self.coins = []
         for pos in map_manager.get_object_position_list("Coin"):
             coin = Coin(pos)
+            self.coins.append(coin)
             self.add(coin, z=1)
 
         # Tạo Obstacle (Door) — linked to buttons[2], reacts to its state each frame
@@ -99,7 +101,18 @@ class GameScene(ScrollableLayer):
             self.player.die()
         self.player.check_stomp(self.mobs)
         self.mobs = [m for m in self.mobs if not m.is_die]
+        self.check_coin_collect()
+        self.coins = [c for c in self.coins if c.parent is not None]
 
+    def check_coin_collect(self):
+        player_rect = self.player.get_leg_collision_rect()  # Cần có method này trong Character
+        for coin in self.coins[:]:
+            if player_rect.intersects(coin.get_hitbox()):
+                coin.collect()
+        player_rect = self.player.get_head_collision_rect()  # Cần có method này trong Character
+        for coin in self.coins[:]:
+            if player_rect.intersects(coin.get_hitbox()):
+                coin.collect()
 
     def on_key_press(self, k, modifiers):
         self.player.handle_key_press(k, modifiers)
@@ -110,6 +123,7 @@ class GameScene(ScrollableLayer):
     def on_mob_die(self, position):
         coin = Coin(position)
         self.add(coin, z=1)
+        self.coins.append(coin)
 
 def create_game_scene(findpath : str = "assets/map.tmx"):
 

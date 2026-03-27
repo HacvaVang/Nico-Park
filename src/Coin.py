@@ -8,7 +8,8 @@ class Coin(Sprite):
         self.animation = self.load_animation_from_strip("./assets/interactions/gold.blink.png", 32,32, 14, 0.3)
         super(Coin, self).__init__(self.animation)
         self.position = position
-        self.anchor = (self.width / 2, 0)
+        self.collected = False
+        #self.anchor = (self.width / 2, 0)
         self.image_anchor = (self.height / 2, 0)
         self.scale = 2
 
@@ -30,7 +31,13 @@ class Coin(Sprite):
 
     def get_hitbox(self):
         """Returns the scaled hitbox of the Mob."""
-        w = self.width * self.scale
-        h = self.height * self.scale
+        w = self.width
+        h = self.height
         x, y = self.position
-        return cocos.rect.Rect(x - w/2, y, w, h)
+        return cocos.rect.Rect(x - w/4, y, w/2, h)
+
+    def collect(self):
+        if self.collected:
+            return
+        self.collected = True
+        self.kill()
