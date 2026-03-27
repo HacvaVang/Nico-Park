@@ -32,6 +32,11 @@ class Character(Sprite):
         self.state = "idle"
         self.is_die = False
         self.is_piloting = False   # True while riding the Ship
+        self.has_gun = False
+        self.has_gun = False
+        self.gun_sprite = None
+        self.shoot_cooldown = 0.3
+        self.shoot_timer = 0
 
         # Store unscaled base dimensions — used for all physics/collision math
         # self.width/height return SCALED values so we must cache the originals
@@ -192,6 +197,15 @@ class Character(Sprite):
         # Smoothly lerp scale toward target each frame
         self.update_scale()
         self.update_animation()
+        if self.has_gun:
+            self.shoot_timer -= dt
+            # Cập nhật vị trí súng theo hướng nhân vật
+            if self.gun_sprite:
+                # Chia cho scale_x để compensate flip của parent
+                offset_x = 20  # scale_x âm → tự đổi dấu
+                print(offset_x)
+                self.gun_sprite.position = (offset_x, 30)
+                # Child đã bị flip theo parent, không cần flip thêm
 
     def update_animation(self):
         if self.is_die:
@@ -203,7 +217,6 @@ class Character(Sprite):
         else:
             new_state = "idle"
 
-            # Chỉ update khi state đổi
         if self.state != new_state:
             self.state = new_state
             self.image = self.animation[self.state]
@@ -293,3 +306,20 @@ class Character(Sprite):
             if in_x and stomping:
                 mob.die()
                 self.velocity[1] = 300  # Nảy lên sau khi giẫm
+
+    def pick_up_gun(self, gun):
+        self.has_gun = True
+        self.gun_sprite = cocos.sprite.Sprite("assets/interactions/Gun.png")
+        self.gun_sprite.scale = 0.8
+        self.add(self.gun_sprite, z=2)
+
+    def shoot(self):
+        if not self.has_gun:
+            return None
+        direction = 1 if self.scale_x > 0 else -1
+        from .Bullet import Bullet
+        px, py = self.position
+        offset_x = 20 if self.scale_x > 0 else -20
+        bullet_pos = (px + offset_x, py + 30)
+        bullet = Bullet(bullet_pos, direction)
+        return bullet

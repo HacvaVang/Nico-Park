@@ -78,4 +78,8 @@ class Mob(Sprite):
             self.on_die(self.position)  # Callback để drop coin
         self.kill()  # Xóa khỏi layer
 
+    def take_damage(self, damage):
+        self.health -= damage
+        if self.health <= 0:
+            self.die()
 
