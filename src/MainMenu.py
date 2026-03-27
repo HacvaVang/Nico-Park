@@ -37,7 +37,7 @@ class MainMenu(Menu):
         items.append(MenuItem('Exit', self.on_exit))
 
         # Add items to the menu
-        self.create_menu(items, shake(), shake_back())
+        self.create_menu(items, zoom_in(), zoom_out())
         self.menu_valign = CENTER
         self.menu_halign = CENTER
 
