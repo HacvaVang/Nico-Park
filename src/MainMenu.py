@@ -41,19 +41,19 @@ class MainMenu(Menu):
         self.menu_valign = CENTER
         self.menu_halign = CENTER
 
-        try:
-            bg_music = media.load('assets/sound/Bounds.wav', streaming=True)            
-            looper = media.SourceGroup(bg_music.audio_format, None)
-            looper.loop = True
-            looper.queue(bg_music)
-
-            self.bg_player = media.Player()
-            self.bg_player.queue(looper)
-            self.bg_player.play()
-
-
-        except Exception as e:
-            print(f"Could not load background music: {e}")
+        # try:
+        #     bg_music = media.load('assets/sound/Bounds.wav', streaming=True)
+        #     looper = media.SourceGroup(bg_music.audio_format, None)
+        #     looper.loop = True
+        #     looper.queue(bg_music)
+        #
+        #     self.bg_player = media.Player()
+        #     self.bg_player.queue(looper)
+        #     self.bg_player.play()
+        #
+        #
+        # except Exception as e:
+        #     print(f"Could not load background music: {e}")
 
     def on_new_game(self):
         # Start the game scene
@@ -119,7 +119,7 @@ class OptionsMenu(Menu):
         items.append(MenuItem('Fullscreen: Off', self.on_dummy))
         items.append(MenuItem('Back', self.on_back))
 
-        self.create_menu(items, shake(), shake_back())
+        self.create_menu(items, zoom_in(), zoom_out())
 
     def on_dummy(self):
         pass
@@ -149,7 +149,7 @@ class AboutMenu(Menu):
         items.append(MenuItem('Version 1.0', self.on_dummy))
         items.append(MenuItem('Back', self.on_back))
 
-        self.create_menu(items, shake(), shake_back())
+        self.create_menu(items, zoom_in(), zoom_out())
 
     def on_dummy(self):
         pass

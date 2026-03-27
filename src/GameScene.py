@@ -13,6 +13,7 @@ from .DebugLayer import DebugLayer
 from .Minion import Mob
 from .Coin import Coin
 from .Ship import Ship
+from .Gun import Gun
 
 import pyglet
 pyglet.options['audio'] = ('ffmpeg', 'openal', 'pulse', 'directsound', 'silent')
@@ -58,6 +59,12 @@ class GameScene(ScrollableLayer):
             self.coins.append(coin)
             self.add(coin, z=1)
 
+        self.guns = []
+        for pos in map_manager.get_object_position_list("Gun"):
+            gun = Gun(pos)
+            self.guns.append(gun)
+            self.add(gun, z=1)
+        self.bullets = []
         # Spawn Ships from map
         self.ships = []
         for pos in map_manager.get_object_position_list("Ship"):
@@ -96,7 +103,12 @@ class GameScene(ScrollableLayer):
     def update(self, dt):
         # Camera follow
         self.scroller.set_focus(self.player.position[0], self.player.position[1])
-
+        if self.player.has_gun and self.player.shoot_timer <= 0:
+            bullet = self.player.shoot()
+            if bullet:
+                self.add(bullet, z=2)
+                self.bullets.append(bullet)
+                self.player.shoot_timer = self.player.shoot_cooldown
         # Kiểm tra va chạm với button
         for button in self.buttons:
             if button.check_interaction(self.player):
@@ -111,6 +123,20 @@ class GameScene(ScrollableLayer):
         self.mobs = [m for m in self.mobs if not m.is_die]
         self.check_coin_collect()
         self.coins = [c for c in self.coins if c.parent is not None]
+        self.check_gun_collect()
+        self.guns = [c for c in self.guns if c.parent is not None]
+
+    def check_gun_collect(self):
+        player_rect = self.player.get_leg_collision_rect()
+        for gun in self.guns[:]:
+            if not gun.collected and player_rect.intersects(gun.get_hitbox()):
+                gun.collect()
+                self.player.pick_up_gun(gun)
+        player_rect = self.player.get_leg_collision_rect()
+        for gun in self.guns[:]:
+            if not gun.collected and player_rect.intersects(gun.get_hitbox()):
+                gun.collect()
+                self.player.pick_up_gun(gun)
 
     def check_coin_collect(self):
         player_rect = self.player.get_leg_collision_rect()  # Cần có method này trong Character
