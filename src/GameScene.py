@@ -94,21 +94,33 @@ class GameScene(ScrollableLayer):
         self.schedule(self.update)
 
     def update(self, dt):
-        # Camera follows the player (or the plane when piloting)
-        focus = self.active_ship.position if self.active_ship else self.player.position
-        self.scroller.set_focus(focus[0], focus[1])
+        # Camera follow
+        self.scroller.set_focus(self.player.position[0], self.player.position[1])
 
-        if self.active_ship is None:
-            # On-foot logic only
-            for button in self.buttons:
-                if button.check_interaction(self.player):
-                    self.player.apply_button_effect(button)
+        # Kiểm tra va chạm với button
+        for button in self.buttons:
+            if button.check_interaction(self.player):
+                self.player.apply_button_effect(button)
 
         # Đẩy character ra khỏi obstacle nếu đang va chạm
         for obs in self.obstacles:
             obs.push_character_out(self.player)
         if self.y >= DIE_DISTANCE and not self.player.is_die:
             self.player.die()
+        self.player.check_stomp(self.mobs)
+        self.mobs = [m for m in self.mobs if not m.is_die]
+        self.check_coin_collect()
+        self.coins = [c for c in self.coins if c.parent is not None]
+
+    def check_coin_collect(self):
+        player_rect = self.player.get_leg_collision_rect()  # Cần có method này trong Character
+        for coin in self.coins[:]:
+            if player_rect.intersects(coin.get_hitbox()):
+                coin.collect()
+        player_rect = self.player.get_head_collision_rect()  # Cần có method này trong Character
+        for coin in self.coins[:]:
+            if player_rect.intersects(coin.get_hitbox()):
+                coin.collect()
 
 
     def on_key_press(self, k, modifiers):
