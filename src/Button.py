@@ -23,6 +23,8 @@ class Button(Sprite):
         super(Button, self).__init__(self._img_off)
         self.type = button_type
         self.position = position
+        self.anchor = (self.width / 2, 0)
+        self.image_anchor = (self.width / 2, 0)
         self.onStatus = False
         self.scale = 1.0
         self.was_colliding = False

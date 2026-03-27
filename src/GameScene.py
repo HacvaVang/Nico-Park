@@ -13,6 +13,8 @@ from .DebugLayer import DebugLayer
 import pyglet
 pyglet.options['audio'] = ('ffmpeg', 'openal', 'pulse', 'directsound', 'silent')
 
+DIE_DISTANCE =  -100
+
 class GameScene(ScrollableLayer):
     is_event_handler = True
 
@@ -27,7 +29,7 @@ class GameScene(ScrollableLayer):
         self.map_manager = map_manager
 
         # Tạo Player
-        self.player = Character("assets/sprite/Blue1.png", map_manager.get_land_collisions(), map_manager.get_starting_position())
+        self.player = Character(map_manager.get_land_collisions(), map_manager.get_starting_position())
         self.add(self.player, z=1)
         
         # Tạo Button
@@ -79,6 +81,9 @@ class GameScene(ScrollableLayer):
         # Đẩy character ra khỏi obstacle nếu đang va chạm
         for obs in self.obstacles:
             obs.push_character_out(self.player)
+        if self.y >= DIE_DISTANCE and not self.player.is_die:
+            self.player.die()
+
 
     def on_key_press(self, k, modifiers):
         self.player.handle_key_press(k, modifiers)
