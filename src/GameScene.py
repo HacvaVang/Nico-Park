@@ -11,6 +11,7 @@ from .MapManager import MapManager
 from .Obstacle import Obstacle
 from .DebugLayer import DebugLayer
 from .Minion import Mob
+from .Coin import Coin
 from .Ship import Ship
 
 import pyglet
@@ -45,9 +46,17 @@ class GameScene(ScrollableLayer):
 
 
         # Tạo Mob
+        self.mobs = []
         for pos in map_manager.get_object_position_list("Mob"):
             mob = Mob(pos)
+            mob.on_die = self.on_mob_die  # Gắn callback
             self.add(mob, z=1)
+            self.mobs.append(mob)
+        self.coins = []
+        for pos in map_manager.get_object_position_list("Coin"):
+            coin = Coin(pos)
+            self.coins.append(coin)
+            self.add(coin, z=1)
 
         # Spawn Ships from map
         self.ships = []
@@ -95,13 +104,11 @@ class GameScene(ScrollableLayer):
                 if button.check_interaction(self.player):
                     self.player.apply_button_effect(button)
 
-            for obs in self.obstacles:
-                obs.push_character_out(self.player)
-
-            # Death check
-            if self.player.position[1] <= DIE_DISTANCE and not self.player.is_die:
-                self.player.die()
-
+        # Đẩy character ra khỏi obstacle nếu đang va chạm
+        for obs in self.obstacles:
+            obs.push_character_out(self.player)
+        if self.y >= DIE_DISTANCE and not self.player.is_die:
+            self.player.die()
 
 
     def on_key_press(self, k, modifiers):
@@ -127,7 +134,10 @@ class GameScene(ScrollableLayer):
         else:
             self.player.handle_key_release(k, modifiers)
 
-
+    def on_mob_die(self, position):
+        coin = Coin(position)
+        self.add(coin, z=1)
+        self.coins.append(coin)
 
 def create_game_scene(findpath : str = "assets/map.tmx"):
 

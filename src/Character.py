@@ -25,7 +25,7 @@ class Character(Sprite):
         self.velocity = [0, 0]
         self.speed = 250
         self.gravity = -600
-        self.jump_speed = 500
+        self.jump_speed = 400
         self.is_on_ground = False
         self.minimum_scale = 0.5
         self.maximum_scale = 2.5
@@ -50,7 +50,16 @@ class Character(Sprite):
         self.leg_rect  = cocos.rect.Rect(0, 0, self.base_w, self.base_h // 3)
         self.head_rect = cocos.rect.Rect(0, 0, self.base_w, self.base_h * 2 // 3)
 
+        self.sound = self.load_sound()
+
         self.schedule(self.update)
+
+    def load_sound(self):
+        return_dict = {}
+        die_sound = pyglet.media.load('assets/sound/die.wav')
+        return_dict["die"] = die_sound
+        return return_dict
+
 
     def load_animation(self):
         dict_animation = {}
@@ -263,3 +272,24 @@ class Character(Sprite):
         self.state = "die"
         self.image = self.animation[self.state]
         self.velocity[1] += 40
+        self.sound["die"].play()
+    def check_stomp(self, mobs):
+        if self.velocity[1] >= 0:  # Đang đi lên hoặc đứng yên thì không stomp
+            return
+
+        px, py = self.position
+        for mob in mobs[:]:  # copy list để xóa an toàn
+            mx, my = mob.position
+            mw = mob.base_w * mob.scale
+            mh = mob.base_h * mob.scale
+
+            # Chân player phải ở trên đầu mob
+            player_bottom = py
+            mob_top = my + mh
+
+            in_x = abs(px - mx) < (mw / 2 + self.base_w * self.scale / 2) * 0.8
+            stomping = player_bottom <= mob_top and player_bottom >= mob_top - 20
+
+            if in_x and stomping:
+                mob.die()
+                self.velocity[1] = 300  # Nảy lên sau khi giẫm

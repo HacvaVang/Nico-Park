@@ -19,18 +19,20 @@ class Mob(Sprite):
         self.position = position
         self.status = MobState.PATROL
         self.health = 100
-        self.scale = 0.5
+        self.scale = 0.75
         # Physics / Movement
         self.speed = 50
         self.velocity = [self.speed, 0]
         self.start_x = position[0]
         self.patrol_distance = 150
+        self.on_die = None
+        self.is_die = False
         
         self.base_w = self.width
         self.base_h = self.height
 
         # Bottom-center anchoring for consistency with physics
-        self.anchor = (self.base_w / 2, 0)
+        # self.anchor = (self.base_w / 2, 0)
         self.image_anchor = (self.base_w / 2, 0)
 
         self.schedule(self.update)
@@ -67,3 +69,13 @@ class Mob(Sprite):
         h = self.base_h * self.scale
         x, y = self.position
         return cocos.rect.Rect(x - w/2, y, w, h)
+
+    def die(self):
+        if self.is_die:
+            return
+        self.is_die = True
+        if self.on_die:
+            self.on_die(self.position)  # Callback để drop coin
+        self.kill()  # Xóa khỏi layer
+
+
