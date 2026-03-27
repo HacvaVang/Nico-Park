@@ -3,6 +3,7 @@ from cocos.sprite import Sprite
 import pyglet.window.key as key
 from enum import Enum
 from .Button import TypeButton, Button
+import pyglet
 
 class CharacterState(Enum):
     IDLE = 0
@@ -10,10 +11,15 @@ class CharacterState(Enum):
     ON_AIR = 2
     DEATH = 3
 
+WALK_ANIM = ["Blue3.png", "Blue4.png", "Blue5.png"]
+JUMP_ANIM = ["Blue6.png"]
+IDLE_ANIM = ["Blue1.png", "Blue11.png"]
+
 
 class Character(Sprite):
-    def __init__(self, image, collision_boxes = None, start_pos = None):
-        super(Character, self).__init__(image=image, position=start_pos)
+    def __init__(self, collision_boxes = None, start_pos = None):
+        self.animation = self.load_animation()
+        super(Character, self).__init__(image = self.animation["idle"],position=start_pos)
         self.collision_boxes = collision_boxes
         self.status = CharacterState.IDLE
         self.velocity = [0, 0]
@@ -21,9 +27,10 @@ class Character(Sprite):
         self.gravity = -600
         self.jump_speed = 300
         self.is_on_ground = False
-        
         self.minimum_scale = 0.5
         self.maximum_scale = 2.5
+        self.state = "idle"
+        self.is_die = False
 
         # Store unscaled base dimensions — used for all physics/collision math
         # self.width/height return SCALED values so we must cache the originals
@@ -34,6 +41,7 @@ class Character(Sprite):
         self.target_scale = 1.0
         self.scale_speed = 0.05
 
+        #self.anchor = (self.base_w / 2, 0)
         self.image_anchor = (self.base_w / 2, 0)
 
         # Current collision rects (updated every frame in update())
@@ -42,6 +50,29 @@ class Character(Sprite):
         self.head_rect = cocos.rect.Rect(0, 0, self.base_w, self.base_h * 2 // 3)
 
         self.schedule(self.update)
+
+    def load_animation(self):
+        dict_animation = {}
+        #load jump
+        jump = []
+        for i in JUMP_ANIM:
+            jump.append(pyglet.image.load(f'assets/sprite/{i}'))
+        idle = []
+
+        for i in IDLE_ANIM:
+            idle.append(pyglet.image.load(f'assets/sprite/{i}'))
+        walk = []
+
+        for i in WALK_ANIM:
+            walk.append(pyglet.image.load(f'assets/sprite/{i}'))
+
+        die = [pyglet.image.load(f'assets/sprite/Blue2.png')]
+
+        dict_animation["jump"] = pyglet.image.Animation.from_image_sequence(jump, 0.1, loop=False)
+        dict_animation["walk"] = pyglet.image.Animation.from_image_sequence(walk, 0.1, loop=True)
+        dict_animation["idle"] = pyglet.image.Animation.from_image_sequence(idle, 0.8, loop=True)
+        dict_animation["die"] = pyglet.image.Animation.from_image_sequence(die, 1, loop=False)
+        return dict_animation
 
     def update(self, dt):
         self.velocity[1] += self.gravity * dt
@@ -111,6 +142,22 @@ class Character(Sprite):
 
         # Smoothly lerp scale toward target each frame
         self.update_scale()
+        self.update_animation()
+
+    def update_animation(self):
+        if self.is_die:
+            return
+        if not self.is_on_ground:
+            new_state = "jump"
+        elif self.velocity[0] != 0:
+            new_state = "walk"
+        else:
+            new_state = "idle"
+
+            # Chỉ update khi state đổi
+        if self.state != new_state:
+            self.state = new_state
+            self.image = self.animation[self.state]
 
     def update_scale(self):
         """Smoothly lerp self.scale toward self.target_scale each frame."""
@@ -149,12 +196,15 @@ class Character(Sprite):
     def handle_key_press(self, k, modifiers):
         if k == key.A:
             self.velocity[0] = -self.speed
+            self.scale_x = -abs(self.scale_x)
         elif k == key.D:
             self.velocity[0] = self.speed
+            self.scale_x = abs(self.scale_x)
         elif k == key.SPACE:
             if self.is_on_ground:
                 self.velocity[1] = self.jump_speed
                 self.is_on_ground = False
+
 
     def handle_key_release(self, k, modifiers):
         if k in (key.A, key.D):
@@ -168,3 +218,8 @@ class Character(Sprite):
     
     def get_full_collision_rect(self):
         return self.rect_x
+    def die(self):
+        self.is_die = True
+        self.state = "die"
+        self.image = self.animation[self.state]
+        self.velocity[1] += 40
