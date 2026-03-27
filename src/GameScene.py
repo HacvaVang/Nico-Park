@@ -2,9 +2,11 @@
 import cocos
 from cocos.layer import ScrollingManager, ScrollableLayer
 from cocos.sprite import Sprite
-from cocos.tiles import load, RectMapLayer
+from cocos.tiles import load, RectMapLayer, TmxObjectLayer
 from cocos.scene import Scene
 import pyglet.window.key as key
+from .Character import Character
+
 
 
 class GameScene(ScrollableLayer):
@@ -15,86 +17,56 @@ class GameScene(ScrollableLayer):
 
         self.scroller = scroller  # nhận scroller qua constructor
 
-        # Physics
-        self.velocity = [0, 0]
-        self.speed = 200
-        self.gravity = -500
-        self.jump_speed = 300
-        self.on_ground = False
-
         # Tạo Player
-        self.player = Sprite("assets/sprite/Blue1.png")
-        self.player.position = (100, 100)
+        self.player = Character("assets/sprite/Blue1.png", create_collision_box(), get_starting_position())
         self.add(self.player, z=1)
 
         self.schedule(self.update)
 
     def update(self, dt):
-        self.velocity[1] += self.gravity * dt
-
-        x, y = self.player.position
-        new_x = x + self.velocity[0] * dt
-        new_y = y + self.velocity[1] * dt
-
-        if new_y <= 100:
-            new_y = 100
-            self.velocity[1] = 0
-            self.on_ground = True
-        else:
-            self.on_ground = False
-
-        self.player.position = (new_x, new_y)
-
         # Camera follow
-        self.scroller.set_focus(new_x, new_y)
+        self.scroller.set_focus(self.player.position[0], self.player.position[1])
 
     def on_key_press(self, k, modifiers):
-        if k == key.LEFT:
-            self.velocity[0] = -self.speed
-        elif k == key.RIGHT:
-            self.velocity[0] = self.speed
-        elif k == key.SPACE:
-            if self.on_ground:
-                self.velocity[1] = self.jump_speed
+        self.player.handle_key_press(k, modifiers)
 
     def on_key_release(self, k, modifiers):
-        if k in (key.LEFT, key.RIGHT):
-            self.velocity[0] = 0
+        self.player.handle_key_release(k, modifiers)
 
+def create_collision_box(findpath : str = "assets/map.tmx"):
+    collision_boxes = list()
 
-    # Trong update(self, dt)
-    def update(self, dt):
-        self.velocity[1] += self.gravity * dt
-        x, y = self.player.position
+    tile_map = load(findpath)
+    for _, obj_layer in tile_map.find(TmxObjectLayer):
+        if (getattr(obj_layer, "name", "") or "").lower() == "land collision":
+            for obj in getattr(obj_layer, "objects", []):
+                x = getattr(obj, "x", 0)
+                y = getattr(obj, "y", 0)
+                w = getattr(obj, "width", 0)
+                h = getattr(obj, "height", 0)
+                collision_boxes.append(cocos.rect.Rect(x, y, w, h))
+    return collision_boxes
 
-        new_x = x + self.velocity[0] * dt
-        new_y = y + self.velocity[1] * dt
+def get_starting_position(findpath : str = "assets/map.tmx"):
+    tile_map = load(findpath)
+    for _, obj_layer in tile_map.find(TmxObjectLayer):
+        if (getattr(obj_layer, "name", "") or "").lower() == "starting position":
+            for obj in getattr(obj_layer, "objects", []):
+                print(obj.x, obj.y)
+                return obj.x, obj.y
+    return 0, 0
 
-        # Tạm thời bỏ giới hạn 100 để xem nhân vật rơi đi đâu
-        # Nếu y quá thấp so với map (576), bạn sẽ không thấy map
-        if new_y < 0:
-            new_y = 0
-            self.velocity[1] = 0
-
-        self.player.position = (new_x, new_y)
-
-        # Ép camera nhìn vào vị trí nhân vật
-        self.scroller.set_focus(new_x, new_y)
-
-
-def create_game_scene():
+def create_game_scene(findpath : str = "assets/map.tmx"):
     scroller = ScrollingManager()
 
-    # Load map
-    tile_map = load("assets/map.tmx")
+    tile_map = load(findpath)
 
-    # Thêm TẤT CẢ các layer tìm thấy
     for name, layer in tile_map.find(RectMapLayer):
         print(f"Rendering layer: {name}")
         scroller.add(layer, z=0)
+    
 
     game_layer = GameScene(scroller)
-    # Thử đặt nhân vật ở giữa bản đồ để dễ tìm camera
     game_layer.player.position = (400, 1000)
 
     scroller.add(game_layer, z=1)
