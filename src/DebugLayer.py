@@ -96,6 +96,10 @@ class DebugLayer(Layer):
         for gun in self.game_layer.guns:
             r = gun.get_hitbox()
             _rect(r.x, r.y, r.width, r.height, COL_OBSTACLE)
+        for boss in self.game_layer.bosses:
+            r = boss.get_hitbox()
+            _rect(r.x, r.y, r.width, r.height, COL_OBSTACLE)
+
 
 
         # ── 5. Ships ─────────────────────────────────────────────────────────

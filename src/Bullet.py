@@ -10,6 +10,7 @@ class Bullet(cocos.cocosnode.CocosNode):
         self.position = position
         self.direction = direction
         self.damage = BULLET_DAMAGE
+        self.scale = 2
         self.dead = False
 
         # Vẽ hình chữ nhật xanh

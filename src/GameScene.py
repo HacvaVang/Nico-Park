@@ -14,6 +14,7 @@ from .Minion import Mob
 from .Coin import Coin
 from .Ship import Ship
 from .Gun import Gun
+from .Boss import Boss
 
 import pyglet
 pyglet.options['audio'] = ('ffmpeg', 'openal', 'pulse', 'directsound', 'silent')
@@ -63,6 +64,8 @@ class GameScene(ScrollableLayer):
         self.coins_collected = 0
         self.coins_required = 3
         self.door_opened = False
+        obstacle_pos = map_manager.get_object_position_list("Obstacle")
+        boss_positions = map_manager.get_object_position_list("AngryNeko")
 
         # Allow map_manager to be injected (avoids double-loading in create_game_scene)
         if map_manager is None:
@@ -85,10 +88,20 @@ class GameScene(ScrollableLayer):
         # Tạo Mob
         self.mobs = []
         for pos in map_manager.get_object_position_list("Mob"):
-            mob = Mob(pos)
-            mob.on_die = self.on_mob_die  # Gắn callback
+            mob = Mob(pos, collision_boxes=map_manager.get_land_collisions())
+            mob.on_die = self.on_mob_die
             self.add(mob, z=1)
             self.mobs.append(mob)
+
+        self.bosses = []
+        for i, pos in enumerate(boss_positions):
+            # Lấy trigger_x từ obstacle tương ứng nếu có
+            trigger_x = obstacle_pos[i][0] if i < len(obstacle_pos) else pos[0]
+            boss = Boss(pos, self)
+            boss.trigger_x = trigger_x
+            self.add(boss, z=1)
+            self.bosses.append(boss)
+
         self.coins = []
         for pos in map_manager.get_object_position_list("Coin"):
             coin = Coin(pos)
@@ -156,6 +169,7 @@ class GameScene(ScrollableLayer):
         self.coins = [c for c in self.coins if c.parent is not None]
         self.check_gun_collect()
         self.guns = [c for c in self.guns if c.parent is not None]
+        self.bosses = [b for b in self.bosses if not b.is_die]
 
     def check_bullet_mob_collision(self, mobs):
         for mob in mobs[:]:
@@ -227,6 +241,14 @@ class GameScene(ScrollableLayer):
         coin = Coin(position)
         self.add(coin, z=1)
         self.coins.append(coin)
+
+    def spawn_mob_at(self, position, direction=1):
+        mob = Mob(position, collision_boxes=self.map_manager.get_land_collisions())
+        mob.on_die = self.on_mob_die
+        mob.velocity[0] = mob.speed * direction
+        mob.scale_x = abs(mob.scale_x) if direction > 0 else -abs(mob.scale_x)
+        self.add(mob, z=1)
+        self.mobs.append(mob)
 
 def create_game_scene(findpath : str = "assets/map.tmx"):
 
