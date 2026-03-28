@@ -28,7 +28,7 @@ class Character(Sprite):
         self.jump_speed = 350
         self.is_on_ground = False
         self.minimum_scale = 0.5
-        self.maximum_scale = 2.5
+        self.maximum_scale = 3.0
         self.state = "idle"
         self.is_die = False
         self.is_piloting = False   # True while riding the Ship

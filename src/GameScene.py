@@ -332,6 +332,12 @@ def create_game_scene(findpath : str = "assets/map.tmx"):
 
     scroller.add(game_layer, z=1)
 
+    # ADD HUD IN SCENE
+    from .HUD import HUDLayer
+    hud = HUDLayer()
+    game_layer.hud_layer = hud
+    main_scene.add(hud, z=2)
+
     main_scene.add(scroller, z=0)
     print("Audio Driver: ", pyglet.media.get_audio_driver())
     return main_scene

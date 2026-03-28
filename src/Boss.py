@@ -21,21 +21,10 @@ class Boss(Sprite):
         self.leg_rect = cocos.rect.Rect(0, 0, self.base_w, self.base_h // 3)
         self.head_rect = cocos.rect.Rect(0, 0, self.base_w, self.base_h * 2 // 3)
 
-        # Health bar
-        self.health_label = cocos.text.Label(
-            f"HP: {self.health}/{self.max_health}",
-            font_name='Arial', font_size=10,
-            x=0, y=self.base_h + 10,
-            anchor_x='center', anchor_y='bottom'
-        )
-        self.health_label.scale_x = 1 / abs(self.scale_x)
-        self.health_label.scale_y = 1 / abs(self.scale_y)
-        self.add(self.health_label, z=5)
-
         # Bay lòng vòng
         self.fly_timer = 0
-        self.fly_radius = 100
-        self.fly_speed = 2.0
+        self.fly_radius = 120
+        self.fly_speed = 1.5
         self.origin_x = position[0]
         self.origin_y = position[1]
 
@@ -47,6 +36,10 @@ class Boss(Sprite):
         self.activated = False
         self.trigger_x = position[0]
         self.visible = False
+        self.warning_distance = 300
+        self.activation_distance = 20
+        self.warning_shown = False
+        self.warning_label = None
 
         self.schedule(self.update)
 
@@ -73,17 +66,58 @@ class Boss(Sprite):
 
         if not self.activated:
             px = self.game_scene.player.position[0]
-            if abs(px - self.trigger_x) < 200:
+            dist_x = abs(px - self.trigger_x)
+            
+            if dist_x < self.warning_distance and not self.warning_shown:
+                self.warning_shown = True
+                import cocos.actions as ac
+                # Warning sign positioned between player and boss
+                wx = self.trigger_x - 300 if px < self.trigger_x else self.trigger_x + 300
+                self.warning_label = cocos.text.Label(
+                    "WARNING: BOSS NEARBY!",
+                    font_name='Pixels',
+                    font_size=36,
+                    color=(255, 0, 0, 255),
+                    x=wx,
+                    y=self.position[1] + 200,
+                    anchor_x='center',
+                    anchor_y='center'
+                )
+                self.game_scene.add(self.warning_label, z=100)
+                self.warning_label.do(ac.Repeat(ac.FadeOut(0.5) + ac.FadeIn(0.5)))
+
+            if dist_x < self.activation_distance:
                 self.activated = True
                 self.visible = True
                 print("Boss ACTIVATED!")
+                if self.warning_label:
+                    self.warning_label.kill()
+                    self.warning_label = None
             return
+
+        px, py = self.game_scene.player.position
+
+        # Chase player
+        chase_speed = 80 * dt
+        dx = px - self.origin_x
+        dy = (py + 100) - self.origin_y  # Target point is slightly above player
+        
+        dist = math.hypot(dx, dy)
+        if dist > 0:
+            self.origin_x += (dx / dist) * chase_speed
+            self.origin_y += (dy / dist) * chase_speed
 
         # Bay lòng vòng
         self.fly_timer += dt
         bx = self.origin_x + math.cos(self.fly_timer * self.fly_speed) * self.fly_radius
         by = self.origin_y + math.sin(self.fly_timer * self.fly_speed) * self.fly_radius
         self.position = (bx, by)
+
+        # Facing direction
+        if px < self.position[0]:
+            self.scale_x = -abs(self.scale_x)
+        else:
+            self.scale_x = abs(self.scale_x)
 
         # Spawn mob
         self.spawn_timer -= dt
@@ -95,12 +129,8 @@ class Boss(Sprite):
         direction = 1 if self.scale_x > 0 else -1
         self.game_scene.spawn_mob_at(self.position, direction)
 
-    def update_health_bar(self):
-        self.health_label.element.text = f"HP: {self.health}/{self.max_health}"
-
     def take_damage(self, damage):
         self.health -= damage
-        self.update_health_bar()
         if self.health <= 0:
             self.die()
 
@@ -108,7 +138,37 @@ class Boss(Sprite):
         if self.is_die:
             return
         self.is_die = True
+        
+        # Display victory text
+        import cocos.actions as ac
+        win_label = cocos.text.Label(
+            "BOSS CLEARED!",
+            font_name='Pixels',
+            font_size=60,
+            color=(255, 133, 76, 255),
+            x=self.position[0],
+            y=self.position[1] + 50,
+            anchor_x='center',
+            anchor_y='center'
+        )
+        self.game_scene.add(win_label, z=100)
+        win_label.do(ac.MoveBy((0, 150), duration=2) | ac.FadeOut(duration=2))
+        
         self.kill()
+
+        try:
+            from .GameScene import SoundManager
+            SoundManager.play_sfx('assets/sound/die.wav')
+        except Exception as e:
+            print(f"Could not play win sound: {e}")
+
+        # Schedule ending the game
+        pyglet.clock.schedule_once(self.end_game, 2.0)
+
+    def end_game(self, dt=0):
+        from cocos.director import director
+        from .MainMenu import create_main_menu
+        director.replace(create_main_menu())
 
     def get_leg_collision_rect(self):
         return self.leg_rect
