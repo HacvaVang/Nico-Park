@@ -139,8 +139,8 @@ class GameScene(ScrollableLayer):
                 self.add(obs, z=1)
 
         # Debug overlay (child of this layer — shares our coordinate space exactly)
-        self.debug_layer = DebugLayer(map_manager, self)
-        self.add(self.debug_layer, z=100)
+        # self.debug_layer = DebugLayer(map_manager, self)
+        # self.add(self.debug_layer, z=100)
 
         # Background music
         SoundManager.play_bgm('assets/sound/Hands.wav')

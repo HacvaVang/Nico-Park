@@ -4,6 +4,8 @@ from cocos.sprite import Sprite
 import pyglet.image
 
 class Coin(Sprite):
+    coin_sound = None
+
     def __init__(self, position):
         self.animation = self.load_animation_from_strip("./assets/interactions/gold.blink.png", 32,32, 14, 0.3)
         super(Coin, self).__init__(self.animation)
@@ -12,6 +14,12 @@ class Coin(Sprite):
         #self.anchor = (self.width / 2, 0)
         self.image_anchor = (self.height / 2, 0)
         self.scale = 2
+
+        if Coin.coin_sound is None:
+            try:
+                Coin.coin_sound = pyglet.media.load('assets/sound/coin.mp3', streaming=False)
+            except Exception as e:
+                print("Failed to load coin sound:", e)
 
     def load_animation_from_strip(self, image_path, frame_width, frame_height, num_frames, duration=0.1, loop=True):
         strip = pyglet.image.load(image_path)
@@ -40,4 +48,11 @@ class Coin(Sprite):
         if self.collected:
             return
         self.collected = True
+
+        if Coin.coin_sound:
+            try:
+                Coin.coin_sound.play()
+            except Exception as e:
+                pass
+
         self.kill()

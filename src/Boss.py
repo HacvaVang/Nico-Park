@@ -10,8 +10,8 @@ class Boss(Sprite):
         super(Boss, self).__init__(img)
         self.position = position[:2]
         self.game_scene = game_scene
-        self.health = 70
-        self.max_health = 70
+        self.health = 40
+        self.max_health = 40
         self.is_die = False
         self.base_w = self.width
         self.base_h = self.height
@@ -100,7 +100,7 @@ class Boss(Sprite):
         # Chase player
         chase_speed = 80 * dt
         dx = px - self.origin_x
-        dy = (py + 100) - self.origin_y  # Target point is slightly above player
+        dy = (py + 80) - self.origin_y  # Target point is slightly above player
         
         dist = math.hypot(dx, dy)
         if dist > 0:
