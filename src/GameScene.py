@@ -60,6 +60,8 @@ class GameScene(ScrollableLayer):
 
     def __init__(self, scroller, map_manager: MapManager = None):
         super(GameScene, self).__init__()
+        # HUD
+        self.hud_layer = None  # Set từ bên ngoài
         self.scroller = scroller
         self.coins_collected = 0
         self.coins_required = 3
@@ -143,6 +145,11 @@ class GameScene(ScrollableLayer):
         self.schedule(self.update)
 
     def update(self, dt):
+        # Cập nhật HUD boss
+        if self.hud_layer and self.bosses:
+            boss = self.bosses[0]
+            if boss.activated:
+                self.hud_layer.update_boss_hp(boss.health, boss.max_health)
         # Camera follow
         self.scroller.set_focus(self.player.position[0], self.player.position[1])
         if self.player.has_gun and self.player.shoot_timer <= 0:
@@ -170,15 +177,59 @@ class GameScene(ScrollableLayer):
         self.check_gun_collect()
         self.guns = [c for c in self.guns if c.parent is not None]
         self.bosses = [b for b in self.bosses if not b.is_die]
+        self.check_bullet_mob_collision(self.bosses)
+        self.player.check_stomp(self.bosses)
+        self.bullets = [b for b in self.bullets if not b.dead and b.parent is not None]
+        self.check_bullet_wall_collision()
 
-    def check_bullet_mob_collision(self, mobs):
-        for mob in mobs[:]:
-            for bullet in self.bullets[:]:
-                if bullet.get_hitbox().intersects(mob.get_hitbox()):
+    def check_bullet_wall_collision(self):
+        land_rects = self.map_manager.get_land_collisions()
+
+        for bullet in self.bullets[:]:
+            if bullet.dead:
+                continue
+
+            bullet_rect = bullet.get_hitbox()
+
+            for rect in land_rects + self.obstacles:
+                if bullet_rect.intersects(rect):
+                    # Debug nếu cần
+                    print("Bullet hit wall -> destroyed")
+
                     bullet.dead = True
-                    mob.take_damage(bullet.damage)
+                    bullet.kill()
+                    break
 
+    def check_bullet_mob_collision(self, targets):
+        for target in targets[:]:
+            for bullet in self.bullets[:]:
+                if bullet.dead:
+                    continue
 
+                bullet_rect = bullet.get_hitbox()
+                hit = False
+
+                # 👇 Nếu là Boss → check head + leg
+                if isinstance(target, Boss):
+                    if bullet_rect.intersects(target.get_leg_collision_rect()) or \
+                            bullet_rect.intersects(target.get_head_collision_rect()):
+                        hit = True
+                else:
+                    # Mob thường
+                    if bullet_rect.intersects(target.get_hitbox()):
+                        hit = True
+
+                if hit:
+                    print(
+                        f"COLLISION DETECTED! Bullet damage={bullet.damage} -> Target {type(target).__name__} HP={getattr(target, 'health', 'N/A')}")
+
+                    target.take_damage(bullet.damage)
+
+                    bullet.dead = True
+                    bullet.kill()
+
+                    if hasattr(target, 'health'):
+                        print(f"After damage -> HP = {target.health}, is_die = {getattr(target, 'is_die', False)}")
     def check_gun_collect(self):
         player_rect = self.player.get_leg_collision_rect()
         for gun in self.guns[:]:

@@ -15,7 +15,7 @@ class Mob(Sprite):
         super(Mob, self).__init__(self.animation["walk"])
         self.position = position[:2]
         self.status = MobState.PATROL
-        self.health = 100
+        self.health = 10
         self.scale = 0.75
         self.speed = 50
         self.velocity = [self.speed, 0]
