@@ -17,8 +17,42 @@ from .Gun import Gun
 
 import pyglet
 pyglet.options['audio'] = ('ffmpeg', 'openal', 'pulse', 'directsound', 'silent')
-
+pyglet.options['debug_media'] = True 
 DIE_DISTANCE =  -100
+
+
+
+
+class SoundManager:
+    player = None
+
+    @classmethod
+    def get_player(cls):
+        if cls.player is None:
+            cls.player = pyglet.media.Player()
+        return cls.player
+
+    @classmethod
+    def play_bgm(cls, path):
+        try:
+            player = cls.get_player()
+            if player.source is not None:
+                return
+            
+            music = pyglet.media.load(path, streaming=True)
+            player.queue(music)
+            player.loop = True
+            player.play()
+        except Exception as e:
+            print(f"BGM Error: {e}")
+
+    @classmethod
+    def play_sfx(cls, path):
+        try:
+            effect = pyglet.media.load(path, streaming=False)
+            effect.play()
+        except Exception as e:
+            pass
 
 class GameScene(ScrollableLayer):
     is_event_handler = True
@@ -88,14 +122,7 @@ class GameScene(ScrollableLayer):
         self.add(self.debug_layer, z=100)
 
         # Background music
-        try:
-            bg_music = pyglet.media.load('assets/sound/Hands.wav')
-            self.bg_player = pyglet.media.Player()
-            self.bg_player.queue(bg_music)
-            self.bg_player.loop = True
-            self.bg_player.play()
-        except Exception as e:
-            print(f"Could not load background music: {e}")
+        SoundManager.play_bgm('assets/sound/Hands.wav')
 
         # Currently piloted ship (None when on foot)
         self.active_ship: Ship = None
@@ -227,4 +254,5 @@ def create_game_scene(findpath : str = "assets/map.tmx"):
     scroller.add(game_layer, z=1)
 
     main_scene.add(scroller, z=0)
+    print("Audio Driver: ", pyglet.media.get_audio_driver())
     return main_scene

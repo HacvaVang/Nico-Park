@@ -25,7 +25,7 @@ class Character(Sprite):
         self.velocity = [0, 0]
         self.speed = 250
         self.gravity = -600
-        self.jump_speed = 400
+        self.jump_speed = 350
         self.is_on_ground = False
         self.minimum_scale = 0.5
         self.maximum_scale = 2.5
@@ -203,7 +203,6 @@ class Character(Sprite):
             if self.gun_sprite:
                 # Chia cho scale_x để compensate flip của parent
                 offset_x = 20  # scale_x âm → tự đổi dấu
-                print(offset_x)
                 self.gun_sprite.position = (offset_x, 30)
                 # Child đã bị flip theo parent, không cần flip thêm
 
@@ -245,7 +244,6 @@ class Character(Sprite):
         elif button_type == TypeButton.StretchHorizontal:
             pass
         elif button_type == TypeButton.Prohibited:  
-            print("Prohibited")
             self.die()
         elif button_type == TypeButton.IncreaseSize:
             self.target_scale += 0.005   # set target, not scale directly
@@ -307,6 +305,7 @@ class Character(Sprite):
         if hasattr(self, 'checkpoint'):
             self.position = self.checkpoint
         self.state = "idle"
+        self.scale = self.target_scale = 1
         self.update_animation()
         self.update_collision_box()
 

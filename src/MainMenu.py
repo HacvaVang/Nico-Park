@@ -7,10 +7,10 @@ import sys
 from .GameScene import create_game_scene
 
 from pyglet import *
-# try:
-#     font_loaded = font.add_font('assets/font/BoldsPixels.ttf')
-# except Exception as e:
-#     print(f"Could not load font: {e}")
+try:
+    font_loaded = font.add_font('assets/font/BoldsPixels.ttf')
+except Exception as e:
+    print(f"Could not load font: {e}")
 class MainMenu(Menu):
     def __init__(self):
         super(MainMenu, self).__init__("Nico Park")
@@ -40,12 +40,22 @@ class MainMenu(Menu):
         self.menu_valign = CENTER
         self.menu_halign = CENTER
 
+        self.bgm = media.load('assets/sound/Bounds.wav', streaming=True)
+        self.player = media.Player()
+        self.player.queue(self.bgm)
+        self.player.loop = True
+        self.player.volume = 1.0
+        self.player.play()        
+
     # ==================== Các hàm callback ====================
     def on_new_game(self):
         if self.is_action_taken:
             return
         self.is_action_taken = True
         print("New Game clicked")
+
+        if hasattr(self, 'player'):
+            self.player.pause()
 
         game_scene = create_game_scene()
         director.replace(game_scene)
