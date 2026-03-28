@@ -60,7 +60,7 @@ class Character(Sprite):
 
     def load_sound(self):
         return_dict = {}
-        die_sound = pyglet.media.load('assets/sound/die.wav')
+        die_sound = pyglet.media.load('assets/sound/die.wav', streaming=False)
         return_dict["die"] = die_sound
         return return_dict
 
@@ -290,7 +290,7 @@ class Character(Sprite):
         self.is_die = True
         self.state = "die"
         self.image = self.animation[self.state]
-        # self.sound["die"].play()
+        self.sound["die"].play()
         
         # Stop horizontal movement, jump up and fall through floor
         self.velocity[0] = 0
