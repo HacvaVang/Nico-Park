@@ -77,6 +77,13 @@ class DebugLayer(Layer):
         r_head = player.get_head_collision_rect()
         _rect(r_head.x, r_head.y, r_head.width, r_head.height, COL_HEAD)
 
+        # Head rect (ceiling detection)
+        r_leg_boss = self.game_layer.bosses[0].get_leg_collision_rect()
+        _rect(r_leg_boss.x, r_leg_boss.y, r_leg_boss.width, r_leg_boss.height, COL_HEAD)
+        # Head rect (ceiling detection)
+        r_head_boss = self.game_layer.bosses[0].get_head_collision_rect()
+        _rect(r_head_boss.x, r_head_boss.y, r_head_boss.width, r_head_boss.height, COL_HEAD)
+
         # ── 3. Buttons ───────────────────────────────────────────────────────
         for btn in self.game_layer.buttons:
             bw, bh = btn.width, btn.height
@@ -95,9 +102,6 @@ class DebugLayer(Layer):
             _rect(r.x, r.y, r.width, r.height, COL_OBSTACLE)
         for gun in self.game_layer.guns:
             r = gun.get_hitbox()
-            _rect(r.x, r.y, r.width, r.height, COL_OBSTACLE)
-        for boss in self.game_layer.bosses:
-            r = boss.get_hitbox()
             _rect(r.x, r.y, r.width, r.height, COL_OBSTACLE)
 
 
