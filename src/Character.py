@@ -355,10 +355,14 @@ class Character(Sprite):
                     return
 
     def pick_up_gun(self, gun):
+        if self.has_gun:
+            return
         self.has_gun = True
+        # Không add vào self, GameScene sẽ add vào layer
         self.gun_sprite = cocos.sprite.Sprite("assets/interactions/Gun.png")
+        self.gun_sprite.image_anchor_x = self.gun_sprite.width // 2
+        self.gun_sprite.image_anchor_y = self.gun_sprite.height // 2
         self.gun_sprite.scale = 0.8
-        self.add(self.gun_sprite, z=2)
 
     def shoot(self):
         if not self.has_gun or self.is_die:
@@ -370,3 +374,9 @@ class Character(Sprite):
         bullet_pos = (px + offset_x, py + 30)
         bullet = Bullet(bullet_pos, direction)
         return bullet
+
+    def get_hitbox(self):
+        w = self.base_w * self.scale
+        h = self.base_h * self.scale
+        x, y = self.position
+        return cocos.rect.Rect(x - w / 2, y, w, h)
