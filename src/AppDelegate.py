@@ -18,7 +18,7 @@ class AppDelegate:
             caption="Nico Park",
             resizable=False
         )
-        menu = False
+        menu = True
 
         scene = create_main_menu() if menu else create_game_scene()
         director.run(scene)

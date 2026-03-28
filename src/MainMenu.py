@@ -4,7 +4,7 @@ from cocos.scene import Scene
 from cocos.director import director
 import sys
 
-from .GameScene import create_game_scene
+from .GameScene import create_game_scene, SoundManager
 
 from pyglet import *
 try:
@@ -39,13 +39,7 @@ class MainMenu(Menu):
         self.create_menu(items, zoom_in(), zoom_out())
         self.menu_valign = CENTER
         self.menu_halign = CENTER
-
-        self.bgm = media.load('assets/sound/Bounds.wav', streaming=True)
-        self.player = media.Player()
-        self.player.queue(self.bgm)
-        self.player.loop = True
-        self.player.volume = 1.0
-        self.player.play()        
+        SoundManager.play_bgm('assets/sound/Bounds.wav')
 
     # ==================== Các hàm callback ====================
     def on_new_game(self):

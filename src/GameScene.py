@@ -18,7 +18,6 @@ from .Boss import Boss
 
 import pyglet
 pyglet.options['audio'] = ('ffmpeg', 'openal', 'pulse', 'directsound', 'silent')
-pyglet.options['debug_media'] = True 
 DIE_DISTANCE =  -100
 
 
@@ -26,6 +25,7 @@ DIE_DISTANCE =  -100
 
 class SoundManager:
     player = None
+    current_bgm_path = None
 
     @classmethod
     def get_player(cls):
@@ -36,14 +36,20 @@ class SoundManager:
     @classmethod
     def play_bgm(cls, path):
         try:
-            player = cls.get_player()
-            if player.source is not None:
+            if cls.current_bgm_path == path:
                 return
             
+            if cls.player is not None:
+                cls.player.pause()
+                cls.player.delete()
+            
+            cls.player = pyglet.media.Player()
+            cls.current_bgm_path = path
+
             music = pyglet.media.load(path, streaming=True)
-            player.queue(music)
-            player.loop = True
-            player.play()
+            cls.player.queue(music)
+            cls.player.loop = True
+            cls.player.play()
         except Exception as e:
             print(f"BGM Error: {e}")
 

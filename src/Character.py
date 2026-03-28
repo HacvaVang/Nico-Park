@@ -44,7 +44,7 @@ class Character(Sprite):
 
         # Smooth scale: set target_scale to animate toward instead of setting self.scale directly
         self.target_scale = 1.0
-        self.scale_speed = 0.05
+        self.scale_speed = 0.02
 
         #self.anchor = (self.base_w / 2, 0)
         self.image_anchor = (self.base_w / 2, 0)
@@ -250,6 +250,7 @@ class Character(Sprite):
         elif button_type == TypeButton.DecreaseSize:
             self.target_scale -= 0.005
         elif button_type == TypeButton.Neutral:
+            
             self.target_scale = 1.0      # snap back to normal over time
             
 
