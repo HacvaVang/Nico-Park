@@ -167,8 +167,8 @@ class Boss(Sprite):
 
     def end_game(self, dt=0):
         from cocos.director import director
-        from .MainMenu import create_main_menu
-        director.replace(create_main_menu())
+        from .MultiplayerMenu import create_multiplayer_menu
+        director.replace(create_multiplayer_menu())
 
     def get_leg_collision_rect(self):
         return self.leg_rect

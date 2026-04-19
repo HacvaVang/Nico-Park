@@ -15,10 +15,10 @@ State format:
              "health": int, "is_die": bool}, ...],
   "bosses": [{"id": int, "x": float, "y": float, "health": int,
               "max_health": int, "is_die": bool, "activated": bool}, ...],
-  "coins": [{"id": int, "x": float, "y": float, "collected": bool}, ...],
+    "keys": [{"id": int, "x": float, "y": float, "collected": bool}, ...],
   "bullets": [{"id": int, "x": float, "y": float, "vx": float, "vy": float,
                 "dead": bool}, ...],
-  "coins_collected": int,
+    "keys_collected": int,
   "door_opened": bool,
 }
 """
@@ -45,10 +45,11 @@ def serialize_state(game: "GameScene", player_id_map: dict) -> dict:
         "players": {},
         "mobs": [],
         "bosses": [],
-        "coins": [],
+        "keys": [],
         "bullets": [],
-        "coins_collected": game.coins_collected,
+        "keys_collected": game.keys_collected,
         "door_opened": game.door_opened,
+        "level_cleared": getattr(game, "level_cleared", False),
     }
 
     # Players
@@ -60,6 +61,7 @@ def serialize_state(game: "GameScene", player_id_map: dict) -> dict:
             "y": char.position[1],
             "vx": getattr(char, 'velocity', [0, 0])[0],
             "vy": getattr(char, 'velocity', [0, 0])[1],
+            "scale": getattr(char, 'scale', 1.0),
             "scale_x": char.scale_x,
             "health": getattr(char, 'health', 3),
             "has_gun": getattr(char, 'has_gun', False),
@@ -89,13 +91,13 @@ def serialize_state(game: "GameScene", player_id_map: dict) -> dict:
             "activated": boss.activated,
         })
 
-    # Coins
-    for i, coin in enumerate(game.coins):
-        state["coins"].append({
+    # Keys
+    for i, key_item in enumerate(game.keys):
+        state["keys"].append({
             "id": i,
-            "x": coin.position[0],
-            "y": coin.position[1],
-            "collected": getattr(coin, 'collected', False),
+            "x": key_item.position[0],
+            "y": key_item.position[1],
+            "collected": getattr(key_item, 'collected', False),
         })
 
     # Bullets
@@ -121,14 +123,22 @@ def apply_state_to_client(state: dict, game: "GameScene", local_player_id: int):
     for pid_str, pdata in state.get("players", {}).items():
         pid = int(pid_str)
         if pid == local_player_id:
-            # Player cục bộ: chỉ sync visual, không override vị trí
-            # (để tránh teleport do network lag - dùng reconciliation sau)
-            pass
+            # Reconciliation nhẹ cho player cục bộ:
+            # nếu lệch quá xa host snapshot thì snap về để tránh desync kéo dài.
+            lx, ly = game.player.position
+            tx, ty = pdata["x"], pdata["y"]
+            dx = tx - lx
+            dy = ty - ly
+            if (dx * dx + dy * dy) > (80 * 80):
+                game.player.position = (tx, ty)
+            game.player.scale = pdata.get("scale", game.player.scale)
+            game.player.scale_x = pdata["scale_x"]
         else:
             # Ghost player (player kia)
             ghost = game.ghost_players.get(pid)
             if ghost:
                 ghost.position = (pdata["x"], pdata["y"])
+                ghost.scale = pdata.get("scale", ghost.scale)
                 ghost.scale_x = pdata["scale_x"]
 
     # Mobs
@@ -139,6 +149,11 @@ def apply_state_to_client(state: dict, game: "GameScene", local_player_id: int):
             mob.position = (mdata["x"], mdata["y"])
             mob.scale_x = mdata["scale_x"]
             mob.is_die = mdata["is_die"]
+            if mob.is_die:
+                # Replica phía client: chỉ ẩn đi để tránh lỗi remove child lặp lại.
+                mob.visible = False
+            else:
+                mob.visible = True
 
     # Bosses
     for bdata in state.get("bosses", []):
@@ -149,18 +164,32 @@ def apply_state_to_client(state: dict, game: "GameScene", local_player_id: int):
             boss.health = bdata["health"]
             boss.is_die = bdata["is_die"]
             boss.activated = bdata["activated"]
+            if boss.is_die:
+                # Replica phía client: chỉ ẩn để giữ indexing ổn định.
+                boss.visible = False
+            else:
+                boss.visible = True
 
-    # Coins
-    for cdata in state.get("coins", []):
-        cid = cdata["id"]
-        if cid < len(game.coins):
-            coin = game.coins[cid]
-            if cdata["collected"] and not coin.collected:
-                coin.collect()
+    # Keys (fallback đọc cả field cũ "coins" để tương thích trạng thái cũ)
+    key_state = state.get("keys", state.get("coins", []))
+    for kdata in key_state:
+        kid = kdata["id"]
+        if kid < len(game.keys):
+            key_item = game.keys[kid]
+            if kdata["collected"] and not key_item.collected:
+                key_item.collect()
 
     # HUD
-    game.coins_collected = state.get("coins_collected", 0)
-    game.door_opened = state.get("door_opened", False)
+    game.keys_collected = state.get("keys_collected", state.get("coins_collected", 0))
+    door_opened = state.get("door_opened", False)
+    if door_opened and not game.door_opened:
+        game.open_door()
+    else:
+        game.door_opened = door_opened
+
+    level_cleared = state.get("level_cleared", False)
+    if level_cleared and not getattr(game, "level_cleared", False):
+        game.on_level_cleared()
 
     # Boss HUD
     if game.hud_layer:

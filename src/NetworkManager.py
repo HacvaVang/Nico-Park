@@ -5,7 +5,7 @@ Host chạy server + game; Client kết nối và gửi input.
 
 Protocol: JSON over TCP, mỗi message kết thúc bằng '\n'
 Message types:
-  Client → Server: {"type": "input",  "data": {"keys": [...], "release": [...]}}
+    Client → Server: {"type": "input",  "data": {"keys": [...], "release": [...], "held": [...]}}
   Server → Client: {"type": "state",  "data": <GameState>}
   Server → Client: {"type": "assign", "data": {"player_id": 1|2}}
   Either way:      {"type": "ping"} / {"type": "pong"}
@@ -225,14 +225,17 @@ class GameClient(NetworkManager):
         with self._lock:
             return self._latest_state
 
-    def send_input(self, keys_pressed: list[str], keys_released: list[str]):
+    def send_input(self, keys_pressed: list[str], keys_released: list[str], held_keys: Optional[list[str]] = None):
         """Gửi input lên server."""
         with self._lock:
             sock = self._sock
         if sock and self.connected:
+            payload = {"keys": keys_pressed, "release": keys_released}
+            if held_keys is not None:
+                payload["held"] = held_keys
             self._send_msg(sock, {
                 "type": "input",
-                "data": {"keys": keys_pressed, "release": keys_released}
+                "data": payload
             })
 
     def start(self):

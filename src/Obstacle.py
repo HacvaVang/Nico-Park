@@ -29,10 +29,11 @@ class Obstacle(cocos.layer.ColorLayer):
         return self.state == ObstacleState.ACTIVE
 
     def get_hitbox(self) -> cocos.rect.Rect:
-        """Return the current AABB hitbox (bottom-left origin, unscaled dims)."""
-        w, h = self.base_w, self.base_h
+        """Return the current AABB hitbox (bottom-left origin, scaled dims)."""
+        w = self.base_w * abs(getattr(self, "scale_x", 1.0))
+        h = self.base_h * abs(getattr(self, "scale_y", 1.0))
         x, y = self.position
-        return cocos.rect.Rect(x , y, w, h)
+        return cocos.rect.Rect(x, y, w, h)
 
     # ------------------------------------------------------------------
     # Update
@@ -152,8 +153,17 @@ class Obstacle(cocos.layer.ColorLayer):
             self.position = (x, new_y)
 
 def _char_rect(character) -> cocos.rect.Rect:
-    """Build the character's AABB using its base (unscaled) dimensions."""
-    w = getattr(character, "base_w", character.width)
-    h = getattr(character, "base_h", character.height)
+    """Use leg collision box when available to reduce sticky obstacle interactions."""
+    if hasattr(character, "get_leg_collision_rect"):
+        try:
+            return character.get_leg_collision_rect()
+        except Exception:
+            pass
+
+    base_w = getattr(character, "base_w", character.width)
+    base_h = getattr(character, "base_h", character.height)
+    scale = getattr(character, "scale", 1.0)
+    w = base_w * scale
+    h = base_h * scale
     cx, cy = character.position
     return cocos.rect.Rect(cx - w / 2, cy, w, h)  # bottom-anchor

@@ -37,12 +37,13 @@ class Button(Sprite):
             self.image = self._img_on if is_on else self._img_off
 
     def check_interaction(self, character):
-        """AABB overlap test using the character's actual scaled, bottom-anchored hitbox."""
-        bw, bh = self.width, self.height
+        """AABB overlap test using a floor-level press zone to avoid sticky side collisions."""
+        bw = self.width * abs(getattr(self, 'scale_x', 1.0))
+        bh = self.height * abs(getattr(self, 'scale_y', 1.0))
         bx, by = self.position
-        button_rect = cocos.rect.Rect(bx - bw/2, by - bh/2, bw, bh)
-
-        # Use base dims × scale (same formula as Character.update physics)
+        # Button sprite dùng bottom anchor, nên vùng nhấn đặt sát mặt sàn của nút.
+        press_h = max(8, bh * 0.55)
+        button_rect = cocos.rect.Rect(bx - bw / 2, by, bw, press_h)
 
         char_rect = character.get_leg_collision_rect()
 

@@ -20,11 +20,12 @@ from cocos.layer import ScrollingManager
 from cocos.tiles import load, RectMapLayer
 import pyglet.window.key as key
 
-from .GameScene import GameScene, SoundManager, create_game_scene as _orig_create
+from .GameScene import GameScene, SoundManager
 from .Character import Character
 from .MapManager import MapManager
 from .NetworkManager import GameServer, GameClient
 from .GameStateSerializer import serialize_state, apply_state_to_client
+from .GameRules import load_rules
 
 # Tốc độ gửi state (giây)
 STATE_SEND_INTERVAL = 1.0 / 30   # 30Hz
@@ -39,12 +40,16 @@ class GhostPlayer(cocos.sprite.Sprite):
     Sprite đơn giản hiển thị vị trí player của người chơi kia.
     Không có physics, chỉ dùng để render.
     """
-    def __init__(self, image_path='assets/sprite/character_idle.png', tint=(180, 220, 255, 200)):
+    def __init__(self, image_path='assets/sprite/Blue1.png', tint=(255, 180, 180, 220)):
         try:
             super().__init__(image_path)
         except Exception:
             # Fallback nếu ảnh không tìm thấy
             super().__init__('assets/AngryNeko.png')
+        # Character thật dùng bottom anchor (x=center, y=0),
+        # nên ghost cũng phải dùng anchor tương tự để không bị lún/nổi.
+        self.image_anchor = (self.width / 2, 0)
+        self.scale = 1.0
         self.color = tint[:3]
         self.opacity = tint[3]
 
@@ -59,18 +64,16 @@ class HostGameScene(GameScene):
     """
 
     def __init__(self, scroller, map_manager: MapManager = None):
-        super().__init__(scroller, map_manager)
+        super().__init__(scroller, map_manager, rules=load_rules())
 
         # Player 2 character (spawn khi client kết nối)
         self.player2: Character = None
         self.p2_connected = False
-
-        # Pending input actions từ network thread
-        self._p2_keys_to_press: list[str] = []
-        self._p2_keys_to_release: list[str] = []
+        self.p2_active_ship = None
 
         # State send timer
         self._state_timer = 0.0
+        self._p2_held_keys: set[str] = set()
 
         # Khởi động server
         self.server = GameServer()
@@ -90,6 +93,12 @@ class HostGameScene(GameScene):
         """Gọi từ network thread khi client ngắt kết nối."""
         print("[Host] Player 2 ngắt kết nối.")
         self.p2_connected = False
+        try:
+            self.server._pending_inputs.clear()
+        except Exception:
+            pass
+        self._p2_held_keys.clear()
+        self.p2_active_ship = None
         if self.player2 and self.player2.parent:
             self.remove(self.player2)
             self.player2 = None
@@ -117,10 +126,6 @@ class HostGameScene(GameScene):
         if self.player2 and not self.player2.is_die:
             self._apply_p2_inputs()
 
-        # Cập nhật player 2 (physics, collision)
-        if self.player2:
-            self._update_player2(dt)
-
         # Game logic bình thường cho player 1
         super().update(dt)
 
@@ -135,38 +140,25 @@ class HostGameScene(GameScene):
         """Lấy input từ server và áp dụng vào player 2."""
         inputs = self.server.pop_inputs()
         for inp in inputs:
+            held = inp.get("held")
+            if held is not None:
+                new_held = set(held)
+                for k in sorted(new_held - self._p2_held_keys):
+                    self._handle_p2_key(k, press=True)
+                for k in sorted(self._p2_held_keys - new_held):
+                    self._handle_p2_key(k, press=False)
+                self._p2_held_keys = new_held
+
             for k in inp.get("keys", []):
                 self._handle_p2_key(k, press=True)
             for k in inp.get("release", []):
                 self._handle_p2_key(k, press=False)
 
-    def _handle_p2_key(self, key_name: str, press: bool):
-        """Dịch tên key và gọi handle_key_press/release trên player 2."""
-        k = _key_name_to_sym(key_name)
-        if k is None:
-            return
-        if press:
-            self.player2.handle_key_press(k, 0)
-        else:
-            self.player2.handle_key_release(k, 0)
-
-    def _update_player2(self, dt):
-        """Cập nhật physics đơn giản cho player 2 (tương tự character update)."""
-        # Player 2 dùng update loop của chính character (đã schedule trong Character)
-        # Chỉ cần check stomp và collision với mob/boss
-        self.player2.check_stomp(self.mobs)
-        self.player2.check_stomp(self.bosses)
-        # Check coin collect cho player 2
-        self._check_coin_collect_for(self.player2)
-
-    def _check_coin_collect_for(self, player):
-        player_rect = player.get_leg_collision_rect()
-        for coin in self.coins[:]:
-            if not coin.collected and player_rect.intersects(coin.get_hitbox()):
-                coin.collect()
-                self.coins_collected += 1
-        if not self.door_opened and self.coins_collected >= self.coins_required:
-            self.open_door()
+    def _iter_players(self):
+        players = [self.player]
+        if self.player2:
+            players.append(self.player2)
+        return players
 
     def _send_state(self):
         player_map = {self.player: 1}
@@ -182,6 +174,46 @@ class HostGameScene(GameScene):
     def on_key_release(self, k, modifiers):
         super().on_key_release(k, modifiers)
 
+    def _handle_p2_key(self, key_name: str, press: bool):
+        k = _key_name_to_sym(key_name)
+        if k is None or self.player2 is None:
+            return
+
+        # Nếu đang lái ship, điều khiển ship trước
+        if self.p2_active_ship is not None:
+            if press:
+                self.p2_active_ship.handle_key_press(k, 0)
+                if self.p2_active_ship.pilot is None:
+                    self.p2_active_ship = None
+            else:
+                self.p2_active_ship.handle_key_release(k, 0)
+            return
+
+        # On-foot: W để lên tàu tương tự player 1
+        if press and k == key.W:
+            for ship in self.ships:
+                if ship.check_interaction(self.player2):
+                    ship.mount(self.player2)
+                    self.p2_active_ship = ship
+                    return
+
+        if press:
+            self.player2.handle_key_press(k, 0)
+        else:
+            self.player2.handle_key_release(k, 0)
+
+    def on_level_cleared(self):
+        if self.level_cleared:
+            return
+        super().on_level_cleared()
+
+    def on_exit(self):
+        try:
+            self.server.stop()
+        except Exception:
+            pass
+        super().on_exit()
+
 
 # ---------------------------------------------------------------------------
 # CLIENT GAME SCENE
@@ -193,7 +225,8 @@ class ClientGameScene(GameScene):
     """
 
     def __init__(self, scroller, map_manager: MapManager, server_ip: str):
-        super().__init__(scroller, map_manager)
+        super().__init__(scroller, map_manager, rules=load_rules())
+        self.player.color = (150, 200, 255)
 
         # Ghost players: {player_id: GhostPlayer}
         self.ghost_players: dict[int, GhostPlayer] = {}
@@ -204,8 +237,26 @@ class ClientGameScene(GameScene):
         self.add(ghost1, z=1)
         self.ghost_players[1] = ghost1
 
+        # Client replica: tắt AI/update tự thân của entities để tránh lệch host.
+        for mob in self.mobs:
+            try:
+                mob.unschedule(mob.update)
+            except Exception:
+                pass
+        for boss in self.bosses:
+            try:
+                boss.unschedule(boss.update)
+            except Exception:
+                pass
+        for obs in self.obstacles:
+            try:
+                obs.unschedule(obs.update)
+            except Exception:
+                pass
+
         # Input tracking
         self._keys_pressed: set[str] = set()
+        self._input_sync_timer = 0.0
 
         # Kết nối tới server
         self.client = GameClient(server_ip)
@@ -227,23 +278,58 @@ class ClientGameScene(GameScene):
         if state:
             apply_state_to_client(state, self, local_player_id=2)
 
-        # Game logic bình thường (player 2 điều khiển cục bộ)
-        super().update(dt)
+        # Client không chạy full world logic để tránh lệch state với host.
+        # Character.update vẫn tự chạy (được schedule trong Character),
+        # nên prediction di chuyển local vẫn mượt.
+        self.scroller.set_focus(self.player.position[0], self.player.position[1])
+
+        self._input_sync_timer += dt
+        if self._input_sync_timer >= 0.1:
+            self._input_sync_timer = 0.0
+            self.client.send_input([], [], list(self._keys_pressed))
+
+    def _should_evaluate_level_clear(self):
+        # Client nhận trạng thái hoàn thành màn từ host authoritative
+        return False
+
+    def on_level_cleared(self):
+        if self.level_cleared:
+            return
+        super().on_level_cleared()
+
+    def on_exit(self):
+        try:
+            # Nhả toàn bộ phím đang giữ trước khi ngắt kết nối để tránh kẹt input trên host
+            if self._keys_pressed:
+                self.client.send_input([], list(self._keys_pressed), [])
+                self._keys_pressed.clear()
+            self.client.stop()
+        except Exception:
+            pass
+        super().on_exit()
 
     def on_key_press(self, k, modifiers):
         key_name = _key_sym_to_name(k)
         if key_name:
             self._keys_pressed.add(key_name)
-            self.client.send_input([key_name], [])
+            self.client.send_input([key_name], [], list(self._keys_pressed))
         # Điều khiển player 2 cục bộ (client-side prediction)
         super().on_key_press(k, modifiers)
 
     def on_key_release(self, k, modifiers):
         key_name = _key_sym_to_name(k)
-        if key_name and key_name in self._keys_pressed:
-            self._keys_pressed.discard(key_name)
-            self.client.send_input([], [key_name])
+        if key_name:
+            if key_name in self._keys_pressed:
+                self._keys_pressed.discard(key_name)
+            self.client.send_input([], [key_name], list(self._keys_pressed))
         super().on_key_release(k, modifiers)
+
+    def on_deactivate(self):
+        if self._keys_pressed:
+            released = list(self._keys_pressed)
+            self._keys_pressed.clear()
+            self.client.send_input([], released, [])
+        return True
 
 
 # ---------------------------------------------------------------------------
@@ -259,6 +345,7 @@ _KEY_MAP = {
     'Z':     key.Z,
     'X':     key.X,
     'W':     key.W,
+    'S':     key.S,
     'A':     key.A,
     'D':     key.D,
 }
