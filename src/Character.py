@@ -62,6 +62,11 @@ class Character(Sprite):
         return_dict = {}
         die_sound = pyglet.media.load('assets/sound/die.wav', streaming=False)
         return_dict["die"] = die_sound
+        try:
+            kick_sound = pyglet.media.load('assets/sound/kick.mp3', streaming=False)
+            return_dict["kick"] = kick_sound
+        except Exception as e:
+            print("Failed to load kick sound:", e)
         return return_dict
 
 
@@ -350,6 +355,8 @@ class Character(Sprite):
 
                 if is_stomp:
                     mob.die()
+                    if "kick" in self.sound:
+                        self.sound["kick"].play()
                     self.velocity[1] = 300  # Bounce up after stomp
                 else:
                     self.die()  # Player dies otherwise

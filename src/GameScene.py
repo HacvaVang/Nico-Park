@@ -157,8 +157,8 @@ class GameScene(ScrollableLayer):
             self.exit_rect = cocos.rect.Rect(ox - 60, oy, 120, 140)
 
         # Debug overlay (child of this layer — shares our coordinate space exactly)
-        self.debug_layer = DebugLayer(map_manager, self)
-        self.add(self.debug_layer, z=100)
+        # self.debug_layer = DebugLayer(map_manager, self)
+        # self.add(self.debug_layer, z=100)
 
         # Background music
         SoundManager.play_bgm('assets/sound/Hands.wav')
