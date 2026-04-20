@@ -12,9 +12,11 @@ from .Obstacle import Obstacle
 from .DebugLayer import DebugLayer
 from .Minion import Mob
 from .Coin import Coin
+from .Key import Key
 from .Ship import Ship
 from .Gun import Gun
 from .Boss import Boss
+from .GameRules import GameRules, load_rules
 
 import pyglet
 pyglet.options['audio'] = ('ffmpeg', 'openal', 'pulse', 'directsound', 'silent')
@@ -64,20 +66,22 @@ class SoundManager:
 class GameScene(ScrollableLayer):
     is_event_handler = True
 
-    def __init__(self, scroller, map_manager: MapManager = None):
+    def __init__(self, scroller, map_manager: MapManager = None, rules: GameRules = None):
         super(GameScene, self).__init__()
-        # HUD
-        self.hud_layer = None  # Set từ bên ngoài
-        self.scroller = scroller
-        self.coins_collected = 0
-        self.coins_required = 3
-        self.door_opened = False
-        obstacle_pos = map_manager.get_object_position_list("Obstacle")
-        boss_positions = map_manager.get_object_position_list("AngryNeko")
-
         # Allow map_manager to be injected (avoids double-loading in create_game_scene)
         if map_manager is None:
             map_manager = MapManager("assets/map.tmx")
+
+        # HUD
+        self.hud_layer = None  # Set từ bên ngoài
+        self.scroller = scroller
+        self.keys_collected = 0
+        self.rules = rules or load_rules()
+        self.keys_required = self.rules.keys_required
+        self.door_opened = False
+        self.level_cleared = False
+        obstacle_pos = map_manager.get_object_position_list("Obstacle")
+        boss_positions = map_manager.get_object_position_list("AngryNeko")
         self.map_manager = map_manager
 
         # Tạo Player
@@ -110,11 +114,19 @@ class GameScene(ScrollableLayer):
             self.add(boss, z=1)
             self.bosses.append(boss)
 
-        self.coins = []
-        for pos in map_manager.get_object_position_list("Coin"):
-            coin = Coin(pos)
-            self.coins.append(coin)
-            self.add(coin, z=1)
+        self.keys = []
+        key_positions = map_manager.get_object_position_list("Key")
+        if not key_positions:
+            # Fallback cho map cũ đang dùng object Coin như key mở cửa.
+            key_positions = map_manager.get_object_position_list("Coin")
+        for pos in key_positions:
+            key_item = Key(pos)
+            self.keys.append(key_item)
+            self.add(key_item, z=1)
+
+        # Nếu map có ít key hơn cấu hình, hạ ngưỡng để tránh khóa cứng cửa.
+        if self.keys:
+            self.keys_required = min(self.keys_required, len(self.keys))
 
         self.guns = []
         for pos in map_manager.get_object_position_list("Gun"):
@@ -138,6 +150,12 @@ class GameScene(ScrollableLayer):
                 self.obstacles.append(obs)
                 self.add(obs, z=1)
 
+        # Exit zone để kiểm tra điều kiện qua màn co-op
+        self.exit_rect = None
+        if obstacle_positions:
+            ox, oy = obstacle_positions[0]
+            self.exit_rect = cocos.rect.Rect(ox - 60, oy, 120, 140)
+
         # Debug overlay (child of this layer — shares our coordinate space exactly)
         # self.debug_layer = DebugLayer(map_manager, self)
         # self.add(self.debug_layer, z=100)
@@ -158,35 +176,56 @@ class GameScene(ScrollableLayer):
                 self.hud_layer.update_boss_hp(boss.health, boss.max_health)
         # Camera follow
         self.scroller.set_focus(self.player.position[0], self.player.position[1])
-        if self.player.has_gun and self.player.shoot_timer <= 0:
-            bullet = self.player.shoot()
-            if bullet:
-                self.add(bullet, z=2)
-                self.bullets.append(bullet)
-                self.player.shoot_timer = self.player.shoot_cooldown
+        for player in self._iter_players():
+            if player.has_gun and player.shoot_timer <= 0:
+                bullet = player.shoot()
+                if bullet:
+                    self.add(bullet, z=2)
+                    self.bullets.append(bullet)
+                    player.shoot_timer = player.shoot_cooldown
+
         # Kiểm tra va chạm với button
-        for button in self.buttons:
-            if button.check_interaction(self.player):
-                self.player.apply_button_effect(button)
+        for player in self._iter_players():
+            for button in self.buttons:
+                if button.check_interaction(player):
+                    player.apply_button_effect(button)
 
         self.check_bullet_mob_collision(self.mobs)
 
         # Đẩy character ra khỏi obstacle nếu đang va chạm
-        for obs in self.obstacles:
-            obs.push_character_out(self.player)
-        if self.y >= DIE_DISTANCE and not self.player.is_die:
-            self.player.die()
-        self.player.check_stomp(self.mobs)
-        self.mobs = [m for m in self.mobs if not m.is_die]
-        self.check_coin_collect()
-        self.coins = [c for c in self.coins if c.parent is not None]
+        for player in self._iter_players():
+            for obs in self.obstacles:
+                obs.push_character_out(player)
+
+        for player in self._iter_players():
+            if player.position[1] <= DIE_DISTANCE and not player.is_die:
+                player.die()
+
+        for player in self._iter_players():
+            player.check_stomp(self.mobs)
+
+        if self.rules.fail_if_any_player_dead:
+            for player in self._iter_players():
+                if player.is_die:
+                    self._team_fail()
+                    return
+
+        self.check_key_collect()
         self.check_gun_collect()
-        self.guns = [c for c in self.guns if c.parent is not None]
-        self.bosses = [b for b in self.bosses if not b.is_die]
         self.check_bullet_mob_collision(self.bosses)
-        self.player.check_stomp(self.bosses)
+        for player in self._iter_players():
+            player.check_stomp(self.bosses)
         self.bullets = [b for b in self.bullets if not b.dead and b.parent is not None]
         self.check_bullet_wall_collision()
+
+        if self._should_evaluate_level_clear():
+            self.check_level_complete()
+
+    def _iter_players(self):
+        return [self.player]
+
+    def _should_evaluate_level_clear(self):
+        return True
 
     def check_bullet_wall_collision(self):
         land_rects = self.map_manager.get_land_collisions()
@@ -208,6 +247,8 @@ class GameScene(ScrollableLayer):
 
     def check_bullet_mob_collision(self, targets):
         for target in targets[:]:
+            if getattr(target, 'is_die', False):
+                continue
             for bullet in self.bullets[:]:
                 if bullet.dead:
                     continue
@@ -237,38 +278,74 @@ class GameScene(ScrollableLayer):
                     if hasattr(target, 'health'):
                         print(f"After damage -> HP = {target.health}, is_die = {getattr(target, 'is_die', False)}")
     def check_gun_collect(self):
-        player_rect = self.player.get_leg_collision_rect()
-        for gun in self.guns[:]:
-            if not gun.collected and player_rect.intersects(gun.get_hitbox()):
-                gun.collect()
-                self.player.pick_up_gun(gun)
-        player_rect = self.player.get_leg_collision_rect()
-        for gun in self.guns[:]:
-            if not gun.collected and player_rect.intersects(gun.get_hitbox()):
-                gun.collect()
-                self.player.pick_up_gun(gun)
+        for player in self._iter_players():
+            player_rect = player.get_leg_collision_rect()
+            for gun in self.guns[:]:
+                if not gun.collected and player_rect.intersects(gun.get_hitbox()):
+                    gun.collect()
+                    player.pick_up_gun(gun)
 
-    def check_coin_collect(self):
-        player_rect = self.player.get_leg_collision_rect()
-        for coin in self.coins[:]:
-            if not coin.collected and player_rect.intersects(coin.get_hitbox()):
-                coin.collect()
-                self.coins_collected += 1
+    def check_key_collect(self):
+        for player in self._iter_players():
+            leg_rect = player.get_leg_collision_rect()
+            head_rect = player.get_head_collision_rect()
+            for key_item in self.keys[:]:
+                if key_item.collected:
+                    continue
+                if leg_rect.intersects(key_item.get_hitbox()) or head_rect.intersects(key_item.get_hitbox()):
+                    key_item.collect()
+                    self.keys_collected += 1
 
-        player_rect = self.player.get_head_collision_rect()
-        for coin in self.coins[:]:
-            if not coin.collected and player_rect.intersects(coin.get_hitbox()):
-                coin.collect()
-                self.coins_collected += 1
-
-        if not self.door_opened and self.coins_collected >= self.coins_required:
+        if not self.door_opened and self.keys_collected >= self.keys_required:
             self.open_door()
 
     def open_door(self):
         self.door_opened = True
         if self.obstacles:
             self.obstacles[0].open()  # Chỉ mở obstacle đầu tiên
-        print(f"Door opened! {self.coins_collected}/{self.coins_required}")
+        print(f"Door opened! keys={self.keys_collected}/{self.keys_required}")
+
+    def check_level_complete(self):
+        if self.level_cleared or not self.door_opened or self.exit_rect is None:
+            return
+
+        players = [p for p in self._iter_players() if p is not None]
+        alive = [p for p in players if not p.is_die]
+        if not alive:
+            return
+
+        if self.rules.require_all_players_at_exit:
+            ok = all(self._is_player_at_exit(p) for p in alive)
+        else:
+            ok = any(self._is_player_at_exit(p) for p in alive)
+
+        if ok:
+            self.on_level_cleared()
+
+    def _is_player_at_exit(self, player):
+        return self.exit_rect.intersects(player.get_leg_collision_rect())
+
+    def on_level_cleared(self):
+        if self.level_cleared:
+            return
+        self.level_cleared = True
+        print("LEVEL CLEARED")
+        label = cocos.text.Label(
+            "LEVEL CLEARED!",
+            font_name='Pixels',
+            font_size=48,
+            color=(255, 245, 170, 255),
+            anchor_x='center',
+            anchor_y='center'
+        )
+        label.position = self.player.position
+        self.add(label, z=100)
+
+    def _team_fail(self):
+        print("TEAM FAILED")
+        from cocos.director import director
+        from .MultiplayerMenu import create_multiplayer_menu
+        director.replace(create_multiplayer_menu())
 
 
     def on_key_press(self, k, modifiers):
@@ -295,9 +372,8 @@ class GameScene(ScrollableLayer):
             self.player.handle_key_release(k, modifiers)
 
     def on_mob_die(self, position):
-        coin = Coin(position)
-        self.add(coin, z=1)
-        self.coins.append(coin)
+        # Không dùng coin để mở cửa nữa; giữ logic chết mob tối giản để tránh lỗi runtime.
+        pass
 
     def spawn_mob_at(self, position, direction=1):
         mob = Mob(position, collision_boxes=self.map_manager.get_land_collisions())
@@ -328,7 +404,7 @@ def create_game_scene(findpath : str = "assets/map.tmx"):
 
     # Single MapManager shared between GameScene and DebugLayer
     map_manager = MapManager(findpath)
-    game_layer  = GameScene(scroller, map_manager)
+    game_layer  = GameScene(scroller, map_manager, rules=load_rules())
 
     scroller.add(game_layer, z=1)
 

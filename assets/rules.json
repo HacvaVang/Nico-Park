@@ -1,0 +1,5 @@
+{
+  "keys_required": 1,
+  "require_all_players_at_exit": true,
+  "fail_if_any_player_dead": false
+}

@@ -1,7 +1,7 @@
 # AppDelegate.py
 import cocos
 from cocos.director import director
-from .MainMenu import create_main_menu
+from .MultiplayerMenu import create_multiplayer_menu as create_main_menu
 from .GameScene import create_game_scene
 
 import os
